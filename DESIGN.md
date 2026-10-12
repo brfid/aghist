@@ -1,6 +1,6 @@
 # Agentic historical research engine
 
-Design and implementation status, 12 October 2026. This is the authoritative design for `aghist`. Author-selected requirements and implementation choices are recorded below; remaining proposals are labeled. The first run writes new research to [aghist-techadoption](../aghist-techadoption/README.md), using the existing [aghist-tech-adoption corpus](../aghist-tech-adoption/README.md) as read-only input.
+Design and implementation status, 12 October 2026. This is the authoritative design for `aghist`. Author-selected requirements and implementation choices are recorded below; remaining proposals are labeled. The local development pilot writes to `~/src/aghist-techadoption`, using `~/src/aghist-tech-adoption` as read-only input. Those separate libraries are not included in this repository.
 
 ## Purpose and repository boundaries
 

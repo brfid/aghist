@@ -1,8 +1,10 @@
 # aghist
 
-A small Python coordinator for historical research teams, using DeepSeek Flash through the author's OpenCode Go subscription.
+A small Python coordinator for historical research teams, using DeepSeek Flash through OpenCode Go.
 
-The engine takes a research brief, an explicit question version, optional read-only corpus paths, and a separate output library. It discovers candidates, retrieves sources, prepares bounded historical accounts, obtains two independent reviews, reconciles them, and proposes grounded working question versions. The author selects the principal question.
+The engine takes a research brief, an explicit question version, optional read-only corpus paths, and a separate output library. It discovers candidates, retrieves sources, prepares bounded historical accounts, obtains two independent reviews, reconciles them, and proposes grounded working question versions. The researcher selects the principal question.
+
+This is an experimental first version. Offline tests pass; live model inference, source retrieval and historical quality still need an inspected pilot. Research libraries and source collections are separate and are not included here.
 
 Read [AGENTS.md](AGENTS.md) and [DESIGN.md](DESIGN.md) for the requirements. Python owns accepted files; agents never write them. There is no maintained case index, database, dashboard or scheduler in this version.
 
@@ -11,6 +13,7 @@ Read [AGENTS.md](AGENTS.md) and [DESIGN.md](DESIGN.md) for the requirements. Pyt
 Python 3.11 or later, [uv](https://docs.astral.sh/uv/), and OpenCode are required.
 
 ```sh
+git clone https://github.com/brfid/aghist.git ~/src/aghist
 cd ~/src/aghist
 uv sync --dev
 uv run pytest
@@ -30,44 +33,38 @@ uv run aghist doctor
 
 `doctor` checks the backend profile and model configuration without a model call. It cannot confirm subscription eligibility. The selected route is `opencode-go/deepseek-v4.1-flash`. No other provider or paid route is used as a fallback. If the backend has a password, supply `OPENCODE_SERVER_PASSWORD` to the coordinator environment too.
 
-## First technology-adoption run
+## First bounded run
 
-The existing corpus at `~/src/aghist-tech-adoption` is **read-only input**. The original `~/src/posts/tech-adoption` pointers are also unchanged. New research goes to **`~/src/aghist-techadoption`**, a distinct library. The existing manuscript remains with its original collection.
-
-The new library is already initialized with the existing question's wording, definitions and criteria as `technology-and-work/v001`, and a bounded pilot brief. After reactivating OpenCode Go, start the backend above and run:
+Create a Markdown question file containing its wording, definitions, scope, component claims and assessment criteria. Keep it outside the new output directory, which must be empty or absent. Then initialize a library:
 
 ```sh
-cd ~/src/aghist
-uv run aghist run \
-  --library ~/src/aghist-techadoption \
-  --source ~/src/aghist-tech-adoption \
-  --brief-file ~/src/aghist-techadoption/brief.md \
+uv run aghist init --library ~/src/aghist-library \
+  --question-id technology-and-work \
+  --question-file /absolute/path/question.md \
+  --purpose 'Explain when and how work changes contribute to technology adoption.'
+```
+
+With the dedicated backend running and an active OpenCode Go subscription, start one small batch:
+
+```sh
+uv run aghist run --library ~/src/aghist-library \
+  --brief 'Investigate one bounded historical case and seek contrary evidence.' \
   --max-cases 1 --minutes 30
 ```
 
-This is an ordinary run with inherited research as an input, not a special corpus migration. The researcher can inspect files within the supplied source root and search/fetch the web. Prior research provides leads and provenance; underlying accounts and retrieval limits remain explicit. Prior verdicts are omitted from review packets. One old file can yield several episodes, and several files can inform one case.
+Add `--source /absolute/path/corpus` for each read-only corpus directory or text file. Inputs and output must be separate; ancestor/descendant overlaps are rejected. Sources are supplied explicitly rather than retained as a hidden default for every future run. Prior research supplies leads and provenance; prior verdicts are omitted from review packets. One old file can yield several episodes, and several files can inform one case.
 
-The Go subscription rejected the initial live check on 11 October 2026. No historical research run has been started. Reactivate it before the pilot; inspect that pilot's sources and judgments before increasing run limits.
+Inspect the pilot's sources and judgments before increasing limits. An inactive subscription stops the run without a provider or billing fallback. The local development pilot remains deferred pending Go reactivation; publishing this code does not start it.
 
-## Other libraries and questions
-
-Create an empty library from a Markdown question containing definitions, scope and assessment criteria:
-
-```sh
-uv run aghist init --library ~/src/another-library \
-  --question-id another-question --question-file /absolute/path/question.md \
-  --purpose 'Explain the mechanism and circumstances in which it holds.'
-```
-
-Use `run --brief 'A bounded gap or contrast'` for web discovery, adding `--source` for each existing corpus directory or text file. Inputs and output must be separate; ancestor/descendant overlaps are rejected. Sources are supplied explicitly rather than retained as a hidden default for every future run.
+## Question versions and reassessment
 
 Runs use the principal question unless `--question-id` and `--version` select a working version. Agent proposals are saved as numbered working versions, with their parent, motivating cases, changed scope and next test. They never update `library.json`'s principal pointer. The author can add or adopt a version explicitly:
 
 ```sh
 uv run aghist question --library /absolute/path/library \
-  --question-id another-question --parent v001 --file /absolute/path/variant.md
+  --question-id technology-and-work --parent v001 --file /absolute/path/variant.md
 uv run aghist adopt --library /absolute/path/library \
-  --question-id another-question --version v002
+  --question-id technology-and-work --version v002
 ```
 
 Reassess an existing case against a selected version, retaining its earlier assessment and evidence:
@@ -128,6 +125,6 @@ Actual retrieved text, tool failures and truncation metadata are retained. Sourc
 
 `uv run pytest` uses temporary libraries and deterministic workers/API fixtures. It covers independent review inputs, source preservation, packet changes, question/evidence revisions, invalidating conclusions, partial writes, writer conflicts, remote-completion recovery, uncertain submissions, permission/timeout/tool limits, subscription stops and bounded retries. Regression checks also cover surviving remote sessions, initial-checkpoint recovery, later UI input, and schema-valid edits to saved judgments or numbered questions. Tests make no model calls.
 
-The installed OpenCode 1.18.35 API was checked without generation using `noReply=true`: supplied message IDs and scoped session permissions survived round trips. Model inference, source retrieval and end-to-end historical quality remain unverified pending subscription reactivation.
+The installed OpenCode 1.18.35 API was checked without generation using `noReply=true`: supplied message IDs and scoped session permissions survived round trips. Model inference, source retrieval and end-to-end historical quality remain unverified pending an inspected live pilot.
 
 Agent JSON is validated locally with JSON Schema. The adapter omits OpenCode's deprecated prompt `tools` field because [1.18.35's implementation](https://github.com/anomalyco/opencode/blob/v1.18.35/packages/opencode/src/session/prompt.ts) replaces session permission rules when that field is present. The [server documentation](https://opencode.ai/docs/server/) describes the shared HTTP/UI backend. The provided isolated profile and runtime checks constrain its use here.
