@@ -1,6 +1,6 @@
 # Agentic historical research engine
 
-Design discussion, 11 October 2026. This is the authoritative design for `aghist`. Requirements are recorded below; proposed operating choices remain labeled. The first topic is maintained independently in [aghist-tech-adoption](../aghist-tech-adoption/README.md).
+Design, 11 October 2026. This is the authoritative design for `aghist`. Author-selected requirements and implementation choices are recorded below; remaining proposals are labeled. The first topic is maintained independently in [aghist-tech-adoption](../aghist-tech-adoption/README.md).
 
 ## Purpose and repository boundaries
 
@@ -24,6 +24,9 @@ The engine and library are separate local Git repositories. The engine must be u
 8. Use files and folders as durable research memory wherever this avoids a separate maintained index.
 9. Implement in Python, use **pytest**, and use **Google-style docstrings for non-trivial functions, classes and other objects**.
 10. Keep the first implementation minimal and robust. Build one working research loop before adding optional infrastructure or conveniences.
+11. Include web discovery and source retrieval in the first working workflow.
+12. Run agents through the author's OpenCode subscription and available OpenCode tooling. Start with the latest DeepSeek Flash offered there.
+13. Agents may create and test working question versions; the author chooses the principal version.
 
 ## Methodological approach
 
@@ -51,7 +54,7 @@ A library keeps a stable research purpose, then one or more named questions. Eac
 
 An assessment identifies `question_id`, `question_version`, `case_id`, the case/evidence revision and the component claims it addresses. One case can be evaluated against several question versions and several components within a version. The cases assessed under a version can be found by scanning their assessment folders and fields.
 
-A question's current record points to its adopted version and identifies any working variants. Agents should maintain useful working iterations. **Which working versions agents may test or adopt without human selection remains open.** The recommendation is that agents may propose and test working versions while the author selects the principal question.
+A question's current record points to its adopted version and identifies any working variants. Agents may create and test useful working versions while preserving the stable purpose and the reasons for each change. The author chooses the principal version. Testing a working version does not promote it to the principal question or replace earlier assessments.
 
 For example, “new technologies often require organizational change to utilize them well” contains separate issues: new to whom, which work changes, what benefit, whether a change is necessary or contributory, through which mechanism, and frequent among which cases. Keep those components explicit rather than silently replacing necessity with helpfulness or a particular outcome with a broader one.
 
@@ -77,7 +80,7 @@ Use a coordinator, researchers, two independent evaluators and a curator/reconci
 
 Separate input packets and access controls should enforce review independence. A researcher summary alone does not replace accessible original evidence. Concurrent workers write separate outputs; one curator writes the accepted account and assessment. A case becomes reviewed for a version only after the required valid evaluations and reconciled assessment exist.
 
-Collection proceeds in bounded, resumable batches with explicit call/spending limits, retrieval limits and stopping rules. Invalidating, adverse and mixed cases receive the same seriousness and source standards as supporting cases. Discovery routes should seek meaningful contrasts rather than only sources already endorsing the proposition. The goal is informative evidence, including evidence that weakens an explanation.
+Collection proceeds in bounded, resumable batches with explicit call, runtime and retrieval limits and stopping rules. Use the selected subscription route; quota exhaustion leaves work resumable. A paid fallback or additional service would be a separate choice. Invalidating, adverse and mixed cases receive the same seriousness and source standards as supporting cases. Discovery routes should seek meaningful contrasts rather than only sources already endorsing the proposition. The goal is informative evidence, including evidence that weakens an explanation.
 
 ## Empirical refinement and protection against drift
 
@@ -120,16 +123,22 @@ The initial library preserves earlier case verdicts and their original scope. Mo
 
 ## First implementation and verification
 
-Python is selected. Recommend a thin runner that takes a library path, reads a question version, obtains two independent evaluations, saves an assessment and resumes interrupted work. Whether the first live slice also discovers new sources remains open. Start with one model provider and only the tools required for that slice. OpenCode can be considered as a worker environment if it simplifies the chosen tasks; it is not a requirement.
+Python coordinates the workflow; OpenCode runs the agents through the author's existing subscription. The first working loop includes web discovery, source retrieval, case preparation, two independent evaluations and a reconciled assessment saved to a library. It must resume interrupted work without discarding valid earlier outputs. Start with one provider and the tools needed for this loop.
+
+Use the documented local `opencode serve` interface from Python. Give each researcher or evaluator a distinct session; fresh reviewer sessions receive their own evidence packets and cannot see each other's reviews. OpenCode supplies agent execution, model access and tools; Python owns question references, record validation, workflow state and accepted file writes. Its CLI remains useful for inspection and manual work; a separate JavaScript application is unnecessary.
+
+Use OpenCode's available `websearch` and `webfetch` tools for discovery and page retrieval before adding another search service. Retain returned evidence with its URL, retrieval time, bibliographic identity, useful locators and actual inspection limits. Search results alone do not validate a case. A converted page or extracted text must not be described as a preserved original PDF. Source storage follows the selected library's instructions.
+
+The selected initial model route is **`opencode-go/deepseek-v4.1-flash`**, confirmed in the installed OpenCode 1.18.35 model list on 11 October 2026; the Go connection was listed as configured. This verifies local configuration, not a successful live inference or current quota. DeepSeek's current Flash release is V4.1, and OpenCode's Go documentation lists that release under `deepseek-v4.1-flash`. Resolve the latest supported Flash at the start of a batch and record the exact provider/model, reported model information, OpenCode version and date in its outputs; keep the choice fixed within a batch.
+
+References: OpenCode [server](https://opencode.ai/docs/server/), [CLI](https://opencode.ai/docs/cli/), [tools](https://opencode.ai/docs/tools/) and [Go models and usage limits](https://opencode.ai/docs/go/), plus DeepSeek's [current model details](https://api-docs.deepseek.com/quick_start/pricing/), checked 11 October 2026. The first implementation should check the installed server's schema instead of assuming every current documentation example matches it. Use bounded batches and stop on subscription quota or runtime limits rather than silently changing the billing route.
 
 Use pytest for meaningful checks of version immutability, references to the intended case/question/evidence revision, completion requiring two evaluations, preservation of earlier assessments, stale-review detection, and resumption after interruption. Model failures and invalid outputs must leave work explicitly unfinished. Use temporary libraries and a deterministic fake worker for offline tests; separately inspect a few real outputs before trusting a live run. Python correctness tests do not establish historical validity.
 
 Use Google-style docstrings for non-trivial objects, explaining behavior, arguments, returns and exceptions where useful. Prefer straightforward functions and a small number of modules. No dashboard, database, search index, plugin framework or multi-provider framework is needed for the first working loop. Add capabilities only when the basic workflow exposes a concrete need.
 
-## Clarifications before implementation
+## First build target
 
-1. **Question authority:** may agents create and test working versions while the author chooses the principal version, may they adopt revisions within a defined scope, or should all changes wait for author selection?
-2. **First live slice:** review selected existing cases first, or include discovery and retrieval from the beginning?
-3. **Live model and budget:** which provider/model and total spending cap should the first paid pilot use? MiniMax and a $25–50 ceiling were discussed but not selected.
+Implement one bounded, manually started batch that discovers and retrieves evidence, prepares a historical case, obtains two independent reviews and saves the assessment against an explicit question and evidence revision. Include working question versions that agents can test without changing the author-selected principal version. Exercise failure and resumption using pytest and fake workers before checking a small live batch through OpenCode.
 
-These are the remaining decisions with immediate implementation consequences. The next step is to settle them, then implement and verify one complete loop in this repository against the separate library.
+The author has settled question authority, discovery from the beginning, Python, OpenCode subscription access and the initial model family. No further architectural choice is needed before this minimal implementation. Numeric batch limits are conservative implementation defaults that can be adjusted after observing actual work. Continuous scheduling and broader tooling come after the basic loop works.
