@@ -149,11 +149,69 @@ Folders retain descriptive names regardless of classification. A folder scan fin
 
 The initial library preserves earlier case verdicts and their original scope. Moving a record into a case folder or creating the first question version does not turn those verdicts into completed evaluations under the new engine.
 
+## Architecture review — proposed implementation decisions
+
+**Status:** Proposed refinements to the accepted plan. **Date:** 11 October 2026. **Decider:** the author. The agreed requirements, two-agent concurrency cap and independent topic library remain in force. This section evaluates implementation choices; it does not resume implementation or start research.
+
+### Context and recommendation
+
+The research scope is coherent. The main unresolved risks are the handoff from retrieved evidence to case interpretation, ambient context leaking into reviews, and retrying a remote operation whose outcome is unknown. Reliability comes from explicit inputs, validated artifacts and bounded recovery. A general agent-management framework would add little to the first workflow.
+
+Recommend one Python workflow with a small OpenCode HTTP adapter and a file store. A longer campaign repeatedly calls that same workflow under a deadline and bounded brief. Use role instructions and fresh sessions rather than separate software agents with their own planners, queues and persistence. Python owns identifiers, state transitions and accepted writes.
+
+```mermaid
+flowchart LR
+    R[Discover, retrieve and draft] --> P[Freeze question and evidence]
+    P --> A[Independent review A]
+    P --> B[Independent review B]
+    A --> C[Reconcile]
+    B --> C
+    C --> W[Validate and save assessment]
+```
+
+### Options and trade-offs
+
+| Choice | Recommendation and consequence |
+| --- | --- |
+| OpenCode HTTP versus a CLI process per job | Keep the documented HTTP interface. CLI calls are attractive for a throwaway script, but inspection, cancellation and recovery already require a persistent server and session identifiers. Use one small adapter and simple polling; the UI can use the same server. |
+| Automatic server management versus connecting to a running backend | Initially connect to a separately started local OpenCode backend and check its health/version. This removes process ownership and automatic restart behavior from the engine. A one-command launcher can follow if startup proves inconvenient. |
+| Curator per case versus conditional or batch-only reconciliation | Keep per-case reconciliation initially, preserving both raw reviews and their disagreements. It gives a simple completion contract. Conditional reconciliation saves calls but requires deciding whether apparently similar reviews truly agree; batch-only reconciliation couples otherwise independent case completion. Reuse the curator role for batch refinement. |
+| A second campaign engine versus repetition of the batch workflow | Use the same workflow for one batch and an hours-long campaign. Only the outer deadline, queue and stopping reason change. |
+| Semantic stagnation scoring versus explicit work limits | Make deadlines, attempt limits, duplicates and retrieval outcomes enforceable. Treat a curator's judgment about diminishing research value as advice initially. Do not add another model-driven controller to decide whether useful progress has occurred. |
+
+### Record and evidence contracts
+
+- A job freezes its question text, case account and selected evidence. Record the question ID/version **and content hash**. Hash only research inputs; generated reviews and logs must not make their own evidence revision stale. Changing a frozen input creates a new assessment revision.
+- Save actual search/retrieval outputs from OpenCode, including failures and truncation/access limits. Give reviewers the retrieved evidence as well as the neutral case account. A researcher-generated source list or paraphrase alone is insufficient. A fetched page is evidence of retrieval, not a mechanical proof of the researcher's causal interpretation.
+- Use a few small structured output contracts for case preparation, review and reconciliation. Python adds authoritative IDs, evidence references and execution metadata, rather than trusting model-echoed identifiers. Keep analytical explanations in prose; schema validity does not establish historical validity.
+- Keep workflow completion separate from research conclusions. Two complete reviews can conclude that a case is mixed, irrelevant, unresolved or invalidating. Preserve those conclusions without treating them as execution errors or rewarding supporting cases.
+- Use Markdown for human accounts and interpretations, a small JSON run record for operational state, and immutable attempt outputs. Save atomically and create an explicit completion receipt referencing the accepted inputs and two reviews. File existence alone does not establish completion. A local advisory lock prevents concurrent coordinators writing one library.
+
+### Independence and recovery
+
+Fresh session IDs are necessary but insufficient if reviewers can read prior verdicts through files, shared instructions, tools or inherited context. Prefer reviewer requests containing only the frozen packet, with tool access limited to that packet; disable delegation and unrelated tools. If more evidence is needed, make a new packet and evaluate both reviewers against it. Treat source text as evidence rather than operational instructions.
+
+Use the OpenCode UI for inspection and separate sessions for manual exploration. Manual changes to an engine-owned review invalidate that attempt; pausing does not itself preserve independence after new instructions or evidence are introduced.
+
+Persist session and message identifiers before submitting a job. After an ambiguous network failure, inspect that job's status/messages before another submission. A client-supplied message ID must not be assumed to guarantee provider idempotency; verify the installed server's behavior. If completion cannot be established, retain an explicit unresolved attempt and stop rather than silently duplicate it. Bound validation retries, tool steps where supported and per-task runtime; inspect late results before accepting a retry.
+
+Keep question refinement at batch boundaries. Agents may create and test working versions as agreed, but testing uses an explicitly selected version and recorded development cases. A new version marks affected prior assessments stale; it should not automatically enqueue the entire corpus. Start with selected reassessments and retain previous conclusions. Preserve candidate duplicate links rather than automatically merging historical episodes by title or shared URL.
+
+### Verification and consequences
+
+Before building the complete workflow, perform a small integration check of the installed OpenCode version: subscription model selection, observed web search/retrieval outputs, structured results, session isolation and cancellation. Documentation establishes available mechanisms, not that this exact combination has worked. Pin the chosen route and record runtime versions for each run.
+
+Prioritize pytest checks for a crash after remote completion but before the local checkpoint, a partial output write, two coordinators, a changed question/evidence packet, a missing or malformed second review, repeated failures, and timeout/permission/quota stops. Inspect a small live batch against the retained sources before an hours-long campaign. These checks are more useful than broad counts of test coverage.
+
+The resulting core needs a workflow, an OpenCode adapter, file persistence/validation and a CLI. These are responsibility boundaries, not a requirement for four classes or a plugin interface. Search indexes, distributed queues, automatic server restarts, corpus-wide reassessment scheduling and additional model providers can wait until observed work justifies them.
+
+References checked 11 October 2026: OpenCode [server](https://opencode.ai/docs/server/), [structured output](https://opencode.ai/docs/sdk/#structured-output), [permissions](https://opencode.ai/docs/permissions/) and [agents](https://opencode.ai/docs/agents/). The installed server contract still needs an integration check.
+
 ## First implementation and verification
 
 Python coordinates the workflow; OpenCode runs the agents through the author's existing subscription. The first working loop includes web discovery, source retrieval, case preparation, two independent evaluations and a reconciled assessment saved to a library. It must resume interrupted work without discarding valid earlier outputs. Start with one provider and the tools needed for this loop.
 
-Use the documented local `opencode serve` interface from Python. Give each researcher or evaluator a distinct session; fresh reviewer sessions receive their own evidence packets and cannot see each other's reviews. OpenCode supplies agent execution, model access and tools; Python owns question references, record validation, workflow state and accepted file writes. Its CLI remains useful for inspection and manual work; a separate JavaScript application is unnecessary.
+Use the documented local server interface from Python; the accepted `opencode web` backend exposes it together with the browser UI. Give each researcher or evaluator a distinct session; fresh reviewer sessions receive their own evidence packets and cannot see each other's reviews. OpenCode supplies agent execution, model access and tools; Python owns question references, record validation, workflow state and accepted file writes. Its CLI remains useful for inspection and manual work; a separate JavaScript application is unnecessary.
 
 Use OpenCode's available `websearch` and `webfetch` tools for discovery and page retrieval before adding another search service. Retain returned evidence with its URL, retrieval time, bibliographic identity, useful locators and actual inspection limits. Search results alone do not validate a case. A converted page or extracted text must not be described as a preserved original PDF. Source storage follows the selected library's instructions.
 
@@ -169,4 +227,4 @@ Use Google-style docstrings for non-trivial objects, explaining behavior, argume
 
 Implement one bounded, manually started batch that discovers and retrieves evidence, prepares a historical case, obtains two independent reviews and saves the assessment against an explicit question and evidence revision. Include working question versions that agents can test without changing the author-selected principal version. Exercise failure and resumption using pytest and fake workers before checking a small live batch through OpenCode.
 
-The author has settled question authority, discovery from the beginning, Python, OpenCode subscription access and the initial model family. No further architectural choice is needed before this minimal implementation. Numeric batch limits are conservative implementation defaults that can be adjusted after observing actual work. Continuous scheduling and broader tooling come after the basic loop works.
+The author has settled question authority, discovery from the beginning, Python, OpenCode subscription access and the initial model family. The main architecture is selected; the review above proposes a smaller implementation and explicit record/recovery contracts. Numeric batch limits are conservative implementation defaults that can be adjusted after observing actual work. Continuous scheduling and broader tooling come after the basic loop works.
