@@ -1,260 +1,150 @@
-# Agentic historical research engine
+# aghist design
 
-Design and implementation status, 12 October 2026. This is the authoritative design for `aghist`. Author-selected requirements and implementation choices are recorded below; remaining proposals are labeled. The local development pilot writes to `~/src/aghist-techadoption`, using `~/src/aghist-tech-adoption` as read-only input. Those separate libraries are not included in this repository.
+This file owns the engine's requirements, research approach, and architecture decisions. It describes the first implementation as of 12 October 2026. Proposed extensions appear under [Later work](#later-work). For commands and operating limits, use [Run historical research](docs/usage.md).
 
-## Purpose and repository boundaries
+## Purpose and boundaries
 
-Build a reusable agentic tool for investigating general historical causal claims, initially by explaining **when and how** they hold. The basic research unit is a historical case. Each evaluation applies a specific version of a research question to a particular revision of that case and its evidence.
+The engine investigates general historical causal claims, initially by explaining **when and how** they hold. A historical case is the basic unit. Every assessment applies an exact question version to a particular revision of the case and its evidence.
 
-- **aghist** owns Python software, pytest tests, agent instructions and this design. It accepts a library path rather than containing a particular topic's cases or source rules.
-- **A topic library** owns its research purpose, question versions, case folders, source records, assessments, synthesis and any associated manuscript. The first output library is `~/src/aghist-techadoption`. The existing corpus and manuscript in `~/src/aghist-tech-adoption`, and the navigation pointers in `~/src/posts/tech-adoption`, remain in place and unedited.
-- The existing public site continues to own approved publication copies and site implementation. Large archival originals may remain at the exact external paths recorded by a library.
+The engine repository owns software, tests, agent instructions, and documentation. Independent topic libraries own their purpose, question versions, cases, evidence, assessments, and manuscripts. Existing research is an explicitly supplied read-only input to an ordinary run; new records go to a separate library. Input and output paths must not overlap. Shared archival originals can remain at external locations with precise provenance.
 
-The engine and library are separate local Git repositories. The engine must be usable with another topic by supplying that topic's question and source guidance, without changing its workflow code. Topic-specific definitions belong in the library rather than the engine's prompts or schemas.
+Topic-specific definitions and source rules belong in the question or brief. The reusable workflow does not inherit an earlier corpus's layout or eligibility template. Reorganizing files does not itself validate a case or authorize publication.
 
-## Settled requirements
+## Research approach
 
-1. Use a team of agents for ongoing discovery, source inspection, evaluation and refinement.
-2. Treat a historical case as the basic unit; save each case in its own descriptive folder.
-3. Record exactly which research-question versions each case has been assessed against. Preserve useful iterations and variants of the question.
-4. Have more than one agent evaluate each case. The proposed minimum is two independent evaluations, beyond preparing the case.
-5. Use empirical cases collectively to improve definitions, identify recurring outcomes and mechanisms, and propose more precise questions.
-6. Collect and investigate invalidating cases as seriously as supporting ones. Preserve mixed and unresolved evidence.
-7. Reassess cases after substantive changes to a question or its definitions, and after relevant evidence changes.
-8. Use files and folders as durable research memory wherever this avoids a separate maintained index.
-9. Implement in Python, use **pytest**, and use **Google-style docstrings for non-trivial functions, classes and other objects**.
-10. Keep the first implementation minimal and robust. Build one working research loop before adding optional infrastructure or conveniences.
-11. Include web discovery and source retrieval in the first working workflow.
-12. Run agents through the author's OpenCode subscription and available OpenCode tooling. Start with the latest DeepSeek Flash offered there.
-13. Agents may create and test working question versions; the author chooses the principal version.
-14. Existing topic research is an ordinary, explicitly supplied read-only input to a run, whose new cases are written to a separate output library. Its inherited file layout and case template do not constrain the reusable engine. Preserve source files, provenance and the scope of earlier judgments; reject overlapping input/output paths.
+The initial target is **contingent generalization**: an explanation whose mechanisms and applicability depend on historical circumstances. This is an aim of inference, not a complete method. The first version supports case comparison and within-case inquiry; it does not estimate prevalence in a historical population.
 
-## Methodological approach
+The author's inspiration from Brenner's Center for Social Theory and Comparative History informs a comparative-historical orientation. [UCLA's description](https://socialsciences.ucla.edu/research-centers/) connects historically rooted social theory with theoretically informed comparative history. It does not prescribe a single method or commit the project to a substantive theory.
 
-The agreed initial target is **contingent generalization**: causal explanations whose mechanisms and applicability depend on historical circumstances. This is a kind of inference to pursue, not a complete research method by itself.
-
-The author's earlier inspiration from Brenner's Center for Social Theory and Comparative History suggests a broader comparative-historical orientation. UCLA describes the center as connecting historically rooted social theory with theoretically informed comparative history. That institutional aim supports the orientation; it does not prescribe a single method or commit this project to a particular substantive theory. [UCLA's description](https://socialsciences.ucla.edu/research-centers/).
-
-Several approaches can work together:
-
-| Approach | Use in this program |
+| Approach | Contribution |
 | --- | --- |
-| Comparative-historical analysis | Compare similar and contrasting historical settings, practices and sequences to develop and challenge explanations. The comparative sequential method explicitly connects comparison across cases with analysis within them. |
-| Process tracing | Examine the sequence and diagnostic evidence within a case to assess a proposed mechanism and alternatives. |
-| Abductive refinement | Use surprising cases and mismatches between expectations and evidence to propose better concepts, questions or explanations. |
-| Typological theorizing | Group cases by combinations of conditions and mechanisms, developing bounded explanations rather than forcing one generalization across all settings. |
-| Qualitative Comparative Analysis (QCA) | A possible later method for comparing combinations of conditions once the case set and coding rules warrant it. Formal set membership and calibration would be additional research decisions; QCA is outside the first implementation. |
+| Comparative-historical analysis | Compare similar and contrasting settings, practices, and sequences to develop and challenge explanations. |
+| Process tracing | Examine a case's sequence and diagnostic evidence to assess a mechanism and alternatives. |
+| Abductive refinement | Use surprising cases and mismatches to propose better concepts or explanations. |
+| Typological theorizing | Develop bounded explanations for combinations of conditions and mechanisms. |
+| Qualitative Comparative Analysis (QCA) | A possible later method once case selection and coding warrant it; calibration requires additional research decisions. |
 
-Recommended starting practice: comparative historical cases, within-case mechanism assessment and explicit proposals for empirical refinement. These are intellectual practices supported by the same simple case-review workflow, not separate software modes.
+These approaches inform the research practice. They are not separate software modes or mechanically enforced methods.
 
-Sources inspected: Falleti and Mahoney, [“The comparative sequential method”](https://www.cambridge.org/core/books/abs/advances-in-comparativehistorical-analysis/comparative-sequential-method/4EA22A74E138226321803CDBDE27618E), *Advances in Comparative-Historical Analysis* (2015), publisher summary; Collier, [“Understanding Process Tracing”](https://www.cambridge.org/core/journals/ps-political-science-and-politics/article/understanding-process-tracing/183A057AD6A36783E678CB37440346D1), *PS* 44(4) (2011), online abstract and opening discussion; Bennett, [“Drawing Contingent Generalizations from Case Studies”](https://www.cambridge.org/core/books/case-for-case-studies/drawing-contingent-generalizations-from-case-studies/58F73BA16250FECBE4D7EE8F5F02943E), *The Case for Case Studies* (2022), online chapter; Tavory and Timmermans, [*Abductive Analysis*](https://press.uchicago.edu/ucp/books/book/chicago/A/bo18785947.html) (2014), publisher description, not the full book; Ragin's [QCA introduction](https://sites.socsci.uci.edu/~cragin/fsQCA/), inspected in full. These inform the proposed method, not evidence that the machine has been validated.
+Methodological sources previously inspected: Falleti and Mahoney, [“The comparative sequential method”](https://www.cambridge.org/core/books/abs/advances-in-comparativehistorical-analysis/comparative-sequential-method/4EA22A74E138226321803CDBDE27618E) (2015), publisher summary; Collier, [“Understanding Process Tracing”](https://www.cambridge.org/core/journals/ps-political-science-and-politics/article/understanding-process-tracing/183A057AD6A36783E678CB37440346D1) (2011), online abstract and opening discussion; Bennett, [“Drawing Contingent Generalizations from Case Studies”](https://www.cambridge.org/core/books/case-for-case-studies/drawing-contingent-generalizations-from-case-studies/58F73BA16250FECBE4D7EE8F5F02943E) (2022), online chapter; Tavory and Timmermans, [*Abductive Analysis*](https://press.uchicago.edu/ucp/books/book/chicago/A/bo18785947.html) (2014), publisher description, not the full book; Ragin's [QCA introduction](https://sites.socsci.uci.edu/~cragin/fsQCA/), inspected in full. This coverage informs the approach; it does not validate the machine.
 
-## Versioning the research question
+### Questions and refinement
 
-A library keeps a stable research purpose, then one or more named questions. Each question has immutable numbered versions such as `v001`, `v002`. A version preserves the exact wording, definitions, scope, component claims or variants, assessment criteria, parent version and reason for revision. Any changed substantive text receives a new version. Git preserves ordinary editing history; a Git commit alone is insufficient as the question identifier in a case assessment.
+A library has a stable research purpose and named questions with immutable numbered versions, such as `v001` and `v002`. Each version preserves its wording, definitions, scope, component claims, assessment criteria, parent, and reason for change. Git history supplements these identifiers; a commit alone does not identify the question in an assessment.
 
-An assessment identifies `question_id`, `question_version`, `case_id`, the case/evidence revision and the component claims it addresses. One case can be evaluated against several question versions and several components within a version. The cases assessed under a version can be found by scanning their assessment folders and fields.
+For example, “new technologies often require organizational change to utilize them well” contains several issues: new to whom, which changes, what benefit, necessity versus contribution, the mechanism, and frequency among which cases. Keep them explicit. A narrower outcome or a weaker causal claim requires a visible revision.
 
-A question's current record points to its adopted version and identifies any working variants. Agents may create and test useful working versions while preserving the stable purpose and the reasons for each change. The author chooses the principal version. Testing a working version does not promote it to the principal question or replace earlier assessments.
+Agents can propose and test working versions. Only author adoption changes the principal pointer in `library.json`. Testing uses an explicitly selected version and preserves earlier assessments. Creating a proposal alone does not change principal-version review status. Adoption or a new evidence revision can leave cases without a current assessment.
 
-For example, “new technologies often require organizational change to utilize them well” contains separate issues: new to whom, which work changes, what benefit, whether a change is necessary or contributory, through which mechanism, and frequent among which cases. Keep those components explicit rather than silently replacing necessity with helpfulness or a particular outcome with a broader one.
+Empirical cases can suggest more specific meanings of an outcome, recurring mechanisms, or useful contrasts. A refinement proposal records changed wording and scope, motivating cases, contrary evidence, effects on judgments, and a next inquiry that could challenge it. Identify cases used to develop a version. A higher proportion of supportive cases is insufficient reason to narrow the question.
 
-## Cases, evidence and assessment
+The stable purpose anchors refinement. A different outcome, population, or purpose needs an explicit branch and rationale. Frequencies describe the collected cases; a selectively assembled collection cannot establish general prevalence. Reassess affected and formerly excluded cases deliberately, preserving current and earlier conclusions.
 
-A case account describes a bounded historical episode or coherent comparison: actors, setting, sequence, practices or interventions, outcomes and uncertainties. It is separate from evaluations against particular questions. Multiple retellings of the same episode are linked rather than treated as independent observations.
+### Cases and evidence
 
-Assessments explain source fidelity, relevance to the question's scope, the mechanism steps supported or unobserved, alternative explanations, invalidating evidence, and the limits of the account. A case can support one component, qualify another and remain inconclusive on a third. Favorable outcomes, causal support and source quality are separate judgments. A credible attributed account can contribute without a numerical measure or a complete causal test.
+A case account describes a bounded episode or coherent comparison: actors, setting, sequence, practices, outcomes, and uncertainties. It remains separate from question-specific judgments. Link retellings of the same episode rather than counting them as independent observations.
 
-Evaluators must assess the question's actual wording. Benefits without a new work change can challenge a necessity claim, but may reveal an already suitable arrangement. Failure despite a work change bears on sufficiency and scope; it does not alone disprove necessity. Missing evidence or failed retrieval is not evidence that an event did not occur.
+Assess source fidelity, relevance, supported and unobserved mechanism steps, alternatives, invalidating evidence, and limits. A case can support one component and qualify another. Favorable outcomes, causal support, and source quality are separate judgments. A credible attributed account can contribute without a numerical measure or a complete causal test. The engine imposes no universal requirement for controlled comparisons, large effects, or independent corroboration.
 
-The selected question version and the library's explicit source guidance govern case inclusion and assessment. The engine should not impose universal demands for controlled comparisons, large effects or independent corroboration. The strength of a case's contribution to a particular generalization is a separate assessment. The inherited technology-adoption template is topic guidance, not the engine's common case schema; a generic case account must accommodate adverse outcomes, absent work changes and unresolved mechanisms.
+Benefits without a new work change can challenge necessity, or reveal an already suitable arrangement. Failure despite a change bears on sufficiency and scope; it does not alone disprove necessity. Missing evidence and failed retrieval do not establish absence. Distinguish source observations, testimony, source explanations, and agent inferences.
 
-## Minimal team workflow
+Invalidating, adverse, mixed, and unresolved cases receive the same seriousness and source standards as supporting cases. Agent agreement is not independent historical corroboration.
 
-Python coordinates four agent sessions per case: one researcher for discovery, retrieval and case preparation; two independent evaluators; and one curator/reconciler. The initial workflow processes one case at a time. At most two agents run concurrently, during the independent reviews. Worker agents cannot launch further agents. The concurrency limit applies across all engine-managed work through a coordinator lock. One discovery session and one synthesis session serve each batch in addition to the four per-case sessions.
+## Workflow and responsibilities
 
-1. Select a bounded investigation addressing a useful uncertainty or comparison.
-2. Gather sources and prepare a case account plus an evidence packet with exact provenance and locators.
-3. Give two fresh evaluators the same question version and evidence revision, with prior verdicts omitted from the review packet. Neither sees the other's verdict before submitting. Both examine the full rubric, including rival explanations and invalidation.
-4. Reconcile the reviews into an assessment, preserving unresolved disagreements and naming any useful follow-up. Agreement among agents is not independent historical corroboration.
-5. Periodically compare reviewed cases and propose informative next investigations or question refinements.
+Python coordinates and accepts records. OpenCode executes the agent jobs.
 
-Separate input packets and access controls should enforce review independence. A researcher summary alone does not replace accessible original evidence. Concurrent workers write separate outputs; one curator writes the accepted account and assessment. A case becomes reviewed for a version only after the required valid evaluations and reconciled assessment exist.
+1. A discovery session selects candidates under the fixed brief and question version, seeking informative contrasts.
+2. A researcher retrieves sources and prepares each bounded case with provenance and inspection limits.
+3. Two fresh evaluators independently assess the same frozen packet. Neither sees the other's review or prior case verdicts.
+4. A reconciler considers the packet and both reviews, preserving unresolved disagreement and useful follow-up.
+5. A synthesis session considers this batch's reconciled summaries and can propose grounded working question versions.
 
-Collection proceeds in bounded, resumable batches with explicit call, runtime and retrieval limits and stopping rules. Use the selected subscription route; quota exhaustion leaves work resumable. A paid fallback or additional service would be a separate choice. Invalidating, adverse and mixed cases receive the same seriousness and source standards as supporting cases. Discovery routes should seek meaningful contrasts rather than only sources already endorsing the proposition. The goal is informative evidence, including evidence that weakens an explanation.
+There are four agent sessions per case, plus discovery and synthesis sessions per batch. Cases proceed one at a time; only the reviewers run concurrently. Workers cannot delegate. A global coordinator lock and a backend check for surviving jobs bound engine-managed concurrency.
 
-## Accepted operating defaults
+Agents return proposals and structured results. Python validates them, supplies authoritative identifiers and references, and writes accepted files. Schema validity establishes structure, not historical truth. Valid supporting, invalidating, mixed, irrelevant, and unresolved judgments can all satisfy workflow completion.
 
-The author accepted these defaults on 11 October 2026:
+### Architecture decisions
 
-- A manually started batch considers up to three candidate cases, one case at a time. No suitable case is a valid result; do not fill a quota.
-- A short research brief directs each batch toward a gap, mechanism or useful contrast, under an explicit question version.
-- Fresh reviewers receive identical frozen evidence and no prior assessments or each other's verdicts.
-- Preserve completed stages, resume unfinished work, use bounded retries and stop on subscription limits.
-- Append evidence and assessment revisions; preserve earlier case accounts and judgments.
-- End each batch with grounded refinement proposals. Agents may create and test working versions; the author selects the principal question.
-- Use an OpenCode backend with browser access through `opencode web`; its terminal UI can attach to the same backend. Inspect sessions at any time; pause the workflow before manually steering an engine-owned session. Changed review evidence requires fresh reviews.
-- Recurring scheduling follows a reliable first loop. These defaults do not start a background research campaign.
+| Decision | Reason and consequence |
+| --- | --- |
+| Thin Python workflow, OpenCode adapter, file store, and CLI | Separate execution, persistence, and coordination without a general agent framework or plugin interface. |
+| Connect to a separately started OpenCode HTTP server | Shared session IDs support inspection, cancellation, and recovery through the same browser or terminal UI. The engine does not own backend startup or restarts. |
+| Keep reconciliation for each case | Preserve both raw reviews and disagreement under a clear completion contract. Conditional or batch-only reconciliation would couple completion to additional decisions. |
+| Use files and folders as research memory | Keep records browsable and reconstruct state by scanning them. A maintained case index or database adds a second source of truth. |
+| Enforce explicit bounds and retries | Deadlines, tool limits, and recorded outcomes give concrete stopping rules. A model-driven stagnation controller can wait. |
+| Hash only the frozen review packet | One checksum detects changed inputs without a content-addressed store or per-file hashing system. |
 
-## Running for hours — proposed requirements
-
-Longer unattended work should repeat small, checkpointed batches under a fixed campaign brief, question version and time budget. The following extends the accepted defaults and remains a design proposal:
-
-- Persist queued work, session/message identifiers, inputs and completed outputs before moving to the next stage. After a restart, inspect already submitted work before creating another request. A lost connection alone does not justify rerunning an agent.
-- Set campaign and per-agent deadlines, a retrieval bound and retry limits. Stop starting new work near the deadline; abort overlong tasks and preserve unfinished state. Quota exhaustion or repeated backend failures stops the campaign without changing provider or billing route.
-- Give agents only the tools needed for their roles. Preconfigure allowed research actions and denied out-of-scope actions. An unexpected permission or user question becomes explicit work needing attention, with a timeout, rather than an indefinite wait.
-- Use one writer for accepted records and a library/run lock to prevent two coordinators writing the same work. Validate question/evidence references and both independent reviews before a case is marked reviewed. Question refinements remain working versions until the author selects a principal version.
-- At batch boundaries, use remaining gaps and contrasts in the brief to choose the next investigation. Record duplicate episodes and sources, retrieval failures and empty results. Stop after repeated batches with no informative progress rather than widening the question merely to keep collecting.
-- Keep a compact current run record with active stage, elapsed time, completed assessments, failures, stopping reason and exact continuation. Keep final research findings in their case/question records. OpenCode sessions support inspection but do not replace durable library records.
-
-A conservative first unattended trial could allow four hours, keep the two-agent concurrency cap and three-case batches, allow ten minutes per agent task, and stop after two successive batches producing only duplicates or inaccessible leads. Numeric limits should be tuned after the first live batch. The host must remain awake with the coordinator alive; resumption should tolerate interruption. Additional process supervision and scheduling are later operational choices.
-
-Sources checked 11 October 2026: OpenCode [server lifecycle and sessions](https://opencode.ai/docs/server/), [permissions](https://opencode.ai/docs/permissions/) and [subscription limits](https://opencode.ai/docs/go/). These document available mechanisms; they do not establish that an hours-long research run has been tested.
-
-## Empirical refinement and protection against drift
-
-Refining the question is part of the agents' research work. In the technology example, the cases may reveal recurring senses of “utilize well”: lower downtime, improved quality, reduced material use, or easier coordination. Agents should propose distinctions grounded in identifiable cases rather than require all outcomes to fit a fixed vocabulary in advance.
-
-Aggregate descriptions may identify a more specific and more frequent variant **within the collected, reviewed cases**. Record the category definition, missing information and the cases it includes. Frequencies in a selectively assembled collection do not establish prevalence across all historical adoptions. The initial priority remains when and how; population frequency estimation is deferred.
-
-Each refinement proposal gives old and new wording, motivating cases, changed definitions or scope, effects on previous judgments, contrary cases and the next inquiry that could challenge it. Preserve useful alternative versions rather than forcing one formulation prematurely. A narrower scope requires a substantive explanation; a higher proportion of supportive cases is insufficient justification.
-
-The author's purpose anchors the inquiry. A different outcome, population or purpose should be identified as a different branch. Cases used to develop a version are identified as development evidence; additional comparisons can then examine it. Reassess affected cases, including formerly excluded cases, when a substantive version changes. Keep old assessments and distinguish current, outdated and unreviewed work in synthesis.
-
-## Library layout
+## Saved records
 
 ```text
-README.md
-library.json
-questions/<question-id>/versions/v001.md
-cases/<case-id>/
-  case.md
-  revisions/r001/
-    case.json
-    case.md
-    evidence.json
-    retrieval.json
-  assessments/<question-id>/<question-version>/<run-id>/
-    packet.json
-    review-a.json
-    review-a.md
-    review-b.json
-    review-b.md
-    assessment.json
-    assessment.md
-    complete.json
-runs/<run-id>/
-  run.json
-  jobs/<stage>/attempt-001/
-    request.json
-    state.json
-    messages.json
-    result.json
-  summary.md
+library.json                         # stable purpose and principal question
+questions/<question>/versions/v001.md
+cases/<case>/case.md                  # navigation to the latest account
+cases/<case>/revisions/r001/
+  case.json / case.md
+  evidence.json
+  retrieval.json
+cases/<case>/assessments/<question>/<version>/<run>/
+  packet.json
+  review-a.json / review-a.md
+  review-b.json / review-b.md
+  assessment.json / assessment.md
+  complete.json
+runs/<run>/run.json                   # operational state
+runs/<run>/jobs/<stage>/attempt-001/
+  request.json
+  state.json
+  messages.json
+  result.json
+runs/<run>/synthesis.json
+runs/<run>/summary.md
 ```
 
-This is the implemented generic layout. `library.json` owns the stable purpose and principal question pointer; numbered Markdown files preserve exact question text. JSON owns structured results and metadata, with Markdown renders for browsing. A question version can also be marked as a working proposal. Exact record serialization is an implementation choice; stable identifiers, version references and evidence revisions are required. A new assessment of changed evidence goes in a distinct assessment revision or run folder; it never overwrites earlier reviews.
+JSON owns structured results and metadata; Markdown renders support browsing. Assessments identify the case, question version, evidence revision, and components addressed. Descriptive case folder names remain stable across classifications. Original attempt outputs, numbered questions, and evidence revisions are preserved; changed evidence receives a new revision and assessment.
 
-Folders retain descriptive names regardless of classification. A folder scan finds cases, assessments and pending reassessment; a separate maintained case index is unnecessary. Any later search index must be rebuildable from authoritative files. Shared source originals can stay outside case folders with precise references. A small amount of operational state records attempts, expenditure and running work; it must not become a second catalogue of research knowledge.
+OpenCode sessions support inspection and recovery. The library files are the durable research record. Job records remain necessary for validating accepted judgments; do not discard them while retaining completion receipts.
 
-The initial library preserves earlier case verdicts and their original scope. Moving a record into a case folder or creating the first question version does not turn those verdicts into completed evaluations under the new engine.
+### Evidence and completion contracts
 
-## Using existing research
+Save actual retrieval outputs, including failures and truncation metadata. A generated bibliography or paraphrase alone is insufficient. Selected excerpts must match returned text at the reported origin. A fetched page demonstrates retrieval, not the truth of a causal interpretation or preservation of an original PDF.
 
-The existing technology-adoption corpus is an ordinary read-only input, supplied by path, to a new aghist run. New research is written to `~/src/aghist-techadoption`. Leave the full corpus at `~/src/aghist-tech-adoption` and the original `posts/tech-adoption` navigation pointers in place and unedited. There is no further corpus migration or compatibility layer.
+Earlier dossiers are ordinary research inputs. Review packets retain substantive source evidence, contradictions, and qualifications while omitting inherited verdicts. Previously checked quotations can be retained extracts, labeled as prior inspection with attribution and limits. They must not be described as a fresh reading of the original. No migration adapter or automatic wholesale conversion is needed.
 
-The ordinary researcher stage uses earlier dossiers as leads, retrieves sources, and prepares bounded historical accounts and evidence packets. The two reviewers and curator then use the same workflow as for newly discovered cases. Preserve references to inherited dossiers and to underlying sources actually used. Distinguish new inspection from checks reported in earlier notes, and carry forward access limits. A prior AI summary supplies leads, not additional corroboration of its source publications.
+Both reviewers receive identical saved packet bytes: the exact question, neutral account, selected retrieved evidence, provenance, and known limits. They have no file or web tools, peer verdicts, or inherited project instructions. More evidence requires a new packet and fresh reviews. Source text is evidence rather than operational instruction.
 
-The shared review packet omits earlier eligibility labels, rankings and verdicts, retaining substantive source evidence, contradictions and qualifications. The researcher may use earlier research; isolated reviewers receive only the frozen packet. Several old notes may inform one episode, and one note may supply several episodes. The new output format follows the reusable workflow rather than the source corpus's layout.
+One SHA-256 checksum detects packet changes. Completion also checks exact numbered question text, frozen case/evidence data, distinct review sessions, required judgments, and their accepted job outputs. Python writes an explicit completion receipt atomically. File existence or schema validity alone cannot establish completion.
 
-Start with a small pilot and inspect its evidence and judgments before broad collection. Creating a case does not validate it. A file reorganization or narrative-template change alone does not change the question; changed definitions, scope or assessment criteria require a new version. The initial output library imports the adopted v001's wording and criteria as its own explicit baseline; later working versions do not automatically replace it.
+### Recovery contracts
 
-## Architecture review — accepted implementation decisions
+Persist session and message identifiers before submission. After an ambiguous network failure, inspect recorded remote activity before submitting again. A client-supplied message ID is not assumed to establish provider idempotency.
 
-**Status:** Accepted, with hashing narrowed to one checksum per frozen review packet. **Date:** 11 October 2026. **Decider:** the author. The agreed requirements, two-agent concurrency cap and independent topic library remain in force. Implementation is authorized. The author will reactivate OpenCode Go before a live research run; no further model calls are authorized in the meantime.
+Empty attempt folders or interrupted atomic-write temporary files precede submission and can be reused. Other missing request records stop for inspection. When the initial state checkpoint is missing, only an empty idle recorded session is eligible for initial submission; existing activity is collected without resubmission.
 
-### Context and recommendation
+Startup checks active aghist jobs on the dedicated backend. Jobs from another run or a superseded attempt block new work; only current attempts of the resumed run are admitted. A local lock alone cannot bound jobs that survive a coordinator crash or failed cancellation.
 
-The research scope is coherent. The main unresolved risks are the handoff from retrieved evidence to case interpretation, ambient context leaking into reviews, and retrying a remote operation whose outcome is unknown. Reliability comes from explicit inputs, validated artifacts and bounded recovery. A general agent-management framework would add little to the first workflow.
+Completed stages are reusable only while their inputs and outputs remain valid. Resumption checks remote messages even for cached completed jobs, detecting outside UI input. Offline status validates local records only. Unknown submission outcomes remain explicit and unfinished; only a confirmed failed, stopped job is eligible for the bounded extra attempt.
 
-Recommend one Python workflow with a small OpenCode HTTP adapter and a file store. A longer campaign repeatedly calls that same workflow under a deadline and bounded brief. Use role instructions and fresh sessions rather than separate software agents with their own planners, queues and persistence. Python owns identifiers, state transitions and accepted writes.
+## OpenCode integration
 
-```mermaid
-flowchart LR
-    R[Discover, retrieve and draft] --> P[Freeze question and evidence]
-    P --> A[Independent review A]
-    P --> B[Independent review B]
-    A --> C[Reconcile]
-    B --> C
-    C --> W[Validate and save assessment]
-```
+The selected default is **`opencode-go/deepseek-v4.1-flash`**. The model list and Go configuration were checked with OpenCode **1.18.35** on 11 October 2026. This pins a checked route; it does not establish current subscription eligibility or claim that it is still the newest release. Check a newer route deliberately before changing the default. Resumption requires the same model route.
 
-### Options and trade-offs
+The supplied launcher separates backend configuration and working context from research inputs and ambient project instructions. Session permissions allow scoped local reads and web search/retrieval for researchers. Analysis roles have no tools; workers cannot edit files, use a shell, or spawn agents.
 
-| Choice | Recommendation and consequence |
-| --- | --- |
-| OpenCode HTTP versus a CLI process per job | Keep the documented HTTP interface. CLI calls are attractive for a throwaway script, but inspection, cancellation and recovery already require a persistent server and session identifiers. Use one small adapter and simple polling; the UI can use the same server. |
-| Automatic server management versus connecting to a running backend | Initially connect to a separately started local OpenCode backend and check its health/version. This removes process ownership and automatic restart behavior from the engine. A one-command launcher can follow if startup proves inconvenient. |
-| Curator per case versus conditional or batch-only reconciliation | Keep per-case reconciliation initially, preserving both raw reviews and their disagreements. It gives a simple completion contract. Conditional reconciliation saves calls but requires deciding whether apparently similar reviews truly agree; batch-only reconciliation couples otherwise independent case completion. Reuse the curator role for batch refinement. |
-| A second campaign engine versus repetition of the batch workflow | Use the same workflow for one batch and an hours-long campaign. Only the outer deadline, queue and stopping reason change. |
-| Semantic stagnation scoring versus explicit work limits | Make deadlines, attempt limits, duplicates and retrieval outcomes enforceable. Treat a curator's judgment about diminishing research value as advice initially. Do not add another model-driven controller to decide whether useful progress has occurred. |
+The adapter validates generated JSON locally. It omits the deprecated prompt `tools` field because [OpenCode 1.18.35's implementation](https://github.com/anomalyco/opencode/blob/v1.18.35/packages/opencode/src/session/prompt.ts) replaces session permissions when that field is present. Scoped session permissions preserve the role boundary.
 
-### Record and evidence contracts
+OpenCode's [server](https://opencode.ai/docs/server/), [permissions](https://opencode.ai/docs/permissions/), [tools](https://opencode.ai/docs/tools/), and [Go documentation](https://opencode.ai/docs/go/) describe the available mechanisms. Check installed behavior when changing OpenCode versions; documentation alone does not validate this workflow.
 
-- A job saves one frozen review packet containing the exact question text, case account and selected source evidence supplied to both reviewers. Use readable question versions and case/evidence revision IDs for naming and navigation. Record one SHA-256 checksum of the packet's saved bytes and check it before reusing a review after interruption and before accepting completion. Include the evidence text itself, not only paths to mutable files. A changed packet requires a new assessment revision and fresh reviews. Keep generated reviews and logs outside the packet. This is a small guard against mixing revisions, not a content-addressed store or a separate per-file hashing system.
-- Save actual search/retrieval outputs from OpenCode, including failures and truncation/access limits. Give reviewers the retrieved evidence as well as the neutral case account. A researcher-generated source list or paraphrase alone is insufficient. A fetched page is evidence of retrieval, not a mechanical proof of the researcher's causal interpretation.
-- Use a few small structured output contracts for case preparation, review and reconciliation. Python adds authoritative IDs, evidence references and execution metadata, rather than trusting model-echoed identifiers. Keep analytical explanations in prose; schema validity does not establish historical validity.
-- Keep workflow completion separate from research conclusions. Two complete reviews can conclude that a case is mixed, irrelevant, unresolved or invalidating. Preserve those conclusions without treating them as execution errors or rewarding supporting cases.
-- Use Markdown for human accounts and interpretations, a small JSON run record for operational state, and immutable attempt outputs. Save atomically and create an explicit completion receipt referencing the accepted inputs and two reviews. Validate exact numbered question text and case/evidence data as well as the packet checksum. Each judgment references its accepted run/job output; schema validity alone cannot make an edited judgment valid. File existence alone does not establish completion. A local advisory lock prevents concurrent coordinators writing one library. Retain original job records with the library so these checks remain possible.
+## Verification and limits
 
-### Independence and recovery
+As of 12 October 2026, **56 pytest tests pass without model calls**. Temporary libraries and deterministic workers or API fixtures exercise version and evidence references, independent reviews, invalidating conclusions, source preservation, partial writes, concurrent writers, uncertain submissions, remote completion, UI input, and permission/time/tool/subscription stops.
 
-Fresh session IDs are necessary but insufficient if reviewers can read prior verdicts through files, shared instructions, tools or inherited context. Prefer reviewer requests containing only the frozen packet, with tool access limited to that packet; disable delegation and unrelated tools. If more evidence is needed, make a new packet and evaluate both reviewers against it. Treat source text as evidence rather than operational instructions.
+Installed-API checks with `noReply=true` verified message identifiers and permission preservation without generation. The initial live request was rejected for an inactive Go subscription and aborted. The pilot remains deferred until the author reactivates Go. Live source retrieval, model output quality, and historical validity remain unverified.
 
-Use the OpenCode UI for inspection and separate sessions for manual exploration. Manual changes to an engine-owned review invalidate that attempt; pausing does not itself preserve independence after new instructions or evidence are introduced. Resumption inspects remote messages even for a completed cached job before reusing its result. Offline status validates local research records; it does not inspect later remote activity.
+The current implementation runs one manually started batch per invocation. Synthesis uses that batch's reconciled summaries, not the accumulated collection or its full evidence. There is no OCR pipeline, automatic full-corpus conversion, or corpus-wide reassessment queue.
 
-Persist session/message identifiers and creation time before submitting a job. An empty attempt folder or only an interrupted atomic-write temporary file precedes submission; it can be reused without consuming a model retry. Other missing-request records stop for inspection. If the initial state checkpoint is missing, inspect the recorded session: only an empty idle session is eligible for initial submission; existing activity is collected without resubmission.
+## Later work
 
-At coordinator startup, check the dedicated backend for active aghist sessions. Active jobs from another run or a superseded attempt block new work; only current attempts of the resumed run are admitted. Resume the owning run or stop those jobs explicitly. The local lock alone cannot bound remote jobs that survive a coordinator crash or failed abort.
+Long-running collection would repeat the same small batches under a fixed campaign brief, question version, and outer deadline. It would need a persistent work queue, stopping rules for repeated empty or inaccessible leads, and deliberate reassessment selection. Longer time allowances alone do not provide this behavior.
 
-After an ambiguous network failure, inspect that job's status/messages before another submission. A client-supplied message ID must not be assumed to guarantee provider idempotency; verify the installed server's behavior. If completion cannot be established, retain an explicit unresolved attempt and stop rather than silently duplicate it. Bound validation retries, tool steps where supported and per-task runtime; inspect late results before accepting a retry.
-
-Keep question refinement at batch boundaries. Agents may create and test working versions as agreed, but testing uses an explicitly selected version and recorded development cases. A new version marks affected prior assessments stale; it should not automatically enqueue the entire corpus. Start with selected reassessments and retain previous conclusions. Preserve candidate duplicate links rather than automatically merging historical episodes by title or shared URL.
-
-### Verification and consequences
-
-Before building the complete workflow, perform a small integration check of the installed OpenCode version: subscription model selection, observed web search/retrieval outputs, structured results, session isolation and cancellation. Documentation establishes available mechanisms, not that this exact combination has worked. Pin the chosen route and record runtime versions for each run.
-
-Prioritize pytest checks for a crash after remote completion but before the local checkpoint, a partial output write, two coordinators, a changed question/evidence packet, a missing or malformed second review, repeated failures, and timeout/permission/quota stops. Inspect a small live batch against the retained sources before an hours-long campaign. These checks are more useful than broad counts of test coverage.
-
-The resulting core needs a workflow, an OpenCode adapter, file persistence/validation and a CLI. These are responsibility boundaries, not a requirement for four classes or a plugin interface. Search indexes, distributed queues, automatic server restarts, corpus-wide reassessment scheduling and additional model providers can wait until observed work justifies them.
-
-References checked 11 October 2026: OpenCode [server](https://opencode.ai/docs/server/), [structured output](https://opencode.ai/docs/sdk/#structured-output), [permissions](https://opencode.ai/docs/permissions/) and [agents](https://opencode.ai/docs/agents/). The installed server contract still needs an integration check.
-
-## First implementation and verification
-
-Python coordinates the workflow; OpenCode runs the agents through the author's existing subscription. The first working loop includes web discovery, source retrieval, case preparation, two independent evaluations and a reconciled assessment saved to a library. It must resume interrupted work without discarding valid earlier outputs. Start with one provider and the tools needed for this loop.
-
-Use the documented local server interface from Python; the accepted `opencode web` backend exposes it together with the browser UI. Give each researcher or evaluator a distinct session; fresh reviewer sessions receive their own evidence packets and cannot see each other's reviews. OpenCode supplies agent execution, model access and tools; Python owns question references, record validation, workflow state and accepted file writes. Its CLI remains useful for inspection and manual work; a separate JavaScript application is unnecessary.
-
-Use OpenCode's available `websearch` and `webfetch` tools for discovery and page retrieval before adding another search service. Retain returned evidence with its URL, retrieval time, bibliographic identity, useful locators and actual inspection limits. Search results alone do not validate a case. A converted page or extracted text must not be described as a preserved original PDF. Source storage follows the selected library's instructions.
-
-The selected initial model route is **`opencode-go/deepseek-v4.1-flash`**, confirmed in the installed OpenCode 1.18.35 model list on 11 October 2026; the Go connection was listed as configured. This verifies local configuration, not a successful live inference or current quota. DeepSeek's current Flash release is V4.1, and OpenCode's Go documentation lists that release under `deepseek-v4.1-flash`. The first implementation pins this verified route, records provider/model information and OpenCode version, and refuses a route change on resumption. Change the configured default deliberately when a newer Flash release has been checked.
-
-References: OpenCode [server](https://opencode.ai/docs/server/), [CLI](https://opencode.ai/docs/cli/), [tools](https://opencode.ai/docs/tools/) and [Go models and usage limits](https://opencode.ai/docs/go/), plus DeepSeek's [current model details](https://api-docs.deepseek.com/quick_start/pricing/), checked 11 October 2026. The first implementation should check the installed server's schema instead of assuming every current documentation example matches it. Use bounded batches and stop on subscription quota or runtime limits rather than silently changing the billing route.
-
-Use pytest for meaningful checks of version immutability, references to the intended case/question/evidence revision, completion requiring two evaluations, preservation of earlier assessments, stale-review detection, and resumption after interruption. Model failures and invalid outputs must leave work explicitly unfinished. Use temporary libraries and a deterministic fake worker for offline tests; separately inspect a few real outputs before trusting a live run. Python correctness tests do not establish historical validity.
-
-Use Google-style docstrings for non-trivial objects, explaining behavior, arguments, returns and exceptions where useful. Prefer straightforward functions and a small number of modules. No dashboard, database, search index, plugin framework or multi-provider framework is needed for the first working loop. Add capabilities only when the basic workflow exposes a concrete need.
-
-## First implemented workflow and verification
-
-The first version implements one bounded, manually started batch, with discovery, retrieval, case preparation, two isolated reviews, reconciliation and batch synthesis. Runs can use existing corpora as read-only inputs or start with web discovery. Explicit reassessment reuses an evidence revision under another question version; refresh appends new evidence. Agents may propose working question versions; only the author-facing adopt command changes the principal pointer.
-
-The implementation uses locally schema-validated JSON responses. It omits OpenCode's deprecated prompt tools field because the installed 1.18.35 implementation replaces session permissions when that field is present. Scoped session permissions and an isolated backend profile instead enforce role access. A single packet checksum detects changed review inputs; saved judgments are also checked against their accepted job outputs and the exact numbered question. Required text must contain non-whitespace content, including source excerpts. Packets are bounded at 256 KB; extra retrieval or a different evidence selection requires a new revision.
-
-Offline verification on 12 October 2026: **56 pytest tests pass**, without model calls. The checks cover independent reviews, read-only inputs, version/reference preservation, stale assessments, atomic writes, writer conflicts, crash recovery, unknown submission outcomes, tool/permission/time limits and subscription retry stops. Installed-API checks with noReply=true verified message IDs and permission preservation without generation. The initial live request was rejected for an inactive Go subscription and was aborted. Historical source retrieval and full model-generated output quality remain unverified until the author reactivates it.
-
-Batch synthesis currently uses reconciled summaries from that batch. Expanding it to accumulated cases or fuller evidence remains a later decision after the inspected pilot. This version runs one batch per invocation. Longer time allowances do not automatically repeat batches. The proposed hours-long repetition, scheduling and process supervision remain later work after a successful inspected pilot.
-
-The author has settled question authority, discovery from the beginning, Python, OpenCode subscription access and the initial model family. The main architecture and the smaller implementation with explicit record/recovery contracts above are accepted. Numeric batch limits are conservative implementation defaults that can be adjusted after observing actual work. Continuous scheduling and broader tooling come after the basic loop works.
+A proposed first unattended trial was four hours, retaining the current concurrency and batch bounds and stopping after two batches with no informative progress. Tune these choices after an inspected live pilot. Scheduling, host/process supervision, accumulated-case synthesis, additional providers, and rebuildable search indexes remain later decisions tied to observed needs.
