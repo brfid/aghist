@@ -30,7 +30,7 @@ class FakeAPI(OpenCode):
     def request(self, method, path, data=None):
         if path == "/session" and method == "POST":
             sid = "ses_" + str(len(self.sessions) + 1)
-            self.sessions[sid] = {"body": None, "permission": data["permission"]}
+            self.sessions[sid] = {"body": None, "permission": data["permission"], "title": data["title"]}
             return {"id": sid}
         if path == "/experimental/tool/ids":
             return ["read", "glob", "grep", "websearch", "webfetch", "bash", "edit", "task", "question", "skill"]
@@ -41,6 +41,8 @@ class FakeAPI(OpenCode):
         if path in {"/permission", "/question"}:
             return [{"sessionID": "ses_1"}] if self.pending_permission else []
         sid = path.split("/")[2]
+        if path == f"/session/{sid}":
+            return {"id": sid, "title": self.sessions[sid]["title"]}
         if path.endswith("/abort"):
             self.aborted.append(sid)
             return True
@@ -193,3 +195,110 @@ def test_retry_flag_still_cannot_exceed_two_attempts(tmp_path):
     with pytest.raises(ResearchError, match="Job failed"):
         api.call(tmp_path / "job", "review", "Frozen packet")
     assert len(api.submissions) == 2
+
+
+def test_first_state_write_failure_recovers_without_duplicate_submission(tmp_path, monkeypatch):
+    from aghist import opencode
+    api = FakeAPI()
+    original = opencode.save
+    def fail_initial_state(path, value, **kwargs):
+        if path.name == "state.json" and not path.exists():
+            raise OSError("Interrupted initial state checkpoint")
+        return original(path, value, **kwargs)
+    monkeypatch.setattr(opencode, "save", fail_initial_state)
+    with pytest.raises(OSError, match="initial state"):
+        api.call(tmp_path / "job", "review", "Frozen packet")
+    assert (attempt_path(tmp_path) / "request.json").exists()
+    assert api.submissions == []
+    monkeypatch.setattr(opencode, "save", original)
+    assert api.call(tmp_path / "job", "review", "Frozen packet")["value"] == review()
+    assert len(api.submissions) == len(api.sessions) == 1
+
+
+def test_missing_state_collects_an_existing_remote_result_without_resubmitting(tmp_path):
+    api = FakeAPI()
+    first = api.call(tmp_path / "job", "review", "Frozen packet")
+    (attempt_path(tmp_path) / "state.json").unlink()
+    assert api.call(tmp_path / "job", "review", "Frozen packet") == first
+    assert len(api.submissions) == 1
+
+
+def test_cached_completion_rejects_later_outside_input(tmp_path):
+    api = FakeAPI()
+    api.call(tmp_path / "job", "review", "Frozen packet")
+    api.extra_user = True
+    with pytest.raises(ResearchError, match="outside input"):
+        api.call(tmp_path / "job", "review", "Frozen packet")
+    assert len(api.submissions) == 1
+
+
+def test_startup_blocks_surviving_owned_jobs_and_allows_their_resume():
+    api = FakeAPI()
+    api.remote_complete = False
+    sessions = [api.request("POST", "/session", {"title": "aghist old-run: review", "permission": []})["id"]
+                for _ in range(2)]
+    with pytest.raises(ResearchError, match="still active"):
+        api.check_active_sessions()
+    api.check_active_sessions(sessions)
+    assert api.submissions == []
+
+
+def test_failed_abort_does_not_allow_a_new_run(monkeypatch):
+    api = FakeAPI()
+    api.remote_complete = False
+    session = api.request("POST", "/session", {"title": "aghist old-run: review", "permission": []})["id"]
+    api.active.add(session)
+    original = api.request
+    def unavailable_abort(method, path, data=None):
+        if path.endswith("/abort"):
+            raise ResearchError("Backend unavailable during cancellation")
+        return original(method, path, data)
+    monkeypatch.setattr(api, "request", unavailable_abort)
+    api.cancel_active()
+    with pytest.raises(ResearchError, match="still active"):
+        api.check_active_sessions()
+    assert api.submissions == []
+
+
+def test_startup_ignores_separate_manual_sessions_and_rejects_more_than_two_owned():
+    api = FakeAPI()
+    api.remote_complete = False
+    api.request("POST", "/session", {"title": "Manual exploration", "permission": []})
+    api.check_active_sessions()
+    sessions = [api.request("POST", "/session", {"title": "aghist old-run: review", "permission": []})["id"]
+                for _ in range(3)]
+    with pytest.raises(ResearchError, match="two-agent"):
+        api.check_active_sessions(sessions)
+
+
+@pytest.mark.parametrize("temporary_left", [False, True])
+def test_interrupted_request_write_can_recover_unsubmitted_preparation(tmp_path, monkeypatch, temporary_left):
+    from aghist import store
+    api = FakeAPI()
+    original = store.os.replace
+    def fail_request(source, destination):
+        if destination.name == "request.json":
+            raise OSError("Interrupted request checkpoint")
+        return original(source, destination)
+    monkeypatch.setattr(store.os, "replace", fail_request)
+    with pytest.raises(OSError, match="request checkpoint"):
+        api.call(tmp_path / "job", "review", "Frozen packet")
+    assert list(attempt_path(tmp_path).iterdir()) == []
+    assert api.submissions == []
+    if temporary_left:
+        (attempt_path(tmp_path) / ".writing-interrupted").write_text("Partial, uncommitted request bytes")
+    monkeypatch.setattr(store.os, "replace", original)
+    assert api.call(tmp_path / "job", "review", "Frozen packet")["value"] == review()
+    assert len(api.submissions) == 1
+    assert load(attempt_path(tmp_path) / "state.json")["status"] == "complete"
+    if temporary_left:
+        assert (attempt_path(tmp_path) / ".writing-interrupted").exists()
+
+
+def test_missing_request_with_other_attempt_records_is_not_silently_retried(tmp_path):
+    api = FakeAPI()
+    api.call(tmp_path / "job", "review", "Frozen packet")
+    (attempt_path(tmp_path) / "request.json").unlink()
+    with pytest.raises(ResearchError, match="metadata is incomplete"):
+        api.call(tmp_path / "job", "review", "Frozen packet")
+    assert len(api.submissions) == 1

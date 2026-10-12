@@ -269,3 +269,43 @@ def test_retained_historical_extract_can_be_reused_without_prior_verdict(library
     assert source["excerpt"] in packet
     assert "LEGACY_VERDICT_NO_COPY" not in packet
     assert "not newly inspected" in packet
+
+
+def test_editing_a_numbered_question_invalidates_review_status(library, worker):
+    run(library, worker)
+    question_path(library, "work-and-change", "v001").write_text("A different question and rubric.")
+    with pytest.raises(ResearchError, match="numbered question"):
+        check_assessment(assessment_dir(library))
+    assert case_states(library)[0]["status"] == "unfinished"
+
+
+def test_question_change_during_execution_prevents_completion(library, worker, monkeypatch):
+    original = worker.call
+    def change_question(directory, kind, prompt, **kwargs):
+        result = original(directory, kind, prompt, **kwargs)
+        if kind == "reconcile":
+            question_path(library, "work-and-change", "v001").write_text("Changed during execution.")
+        return result
+    monkeypatch.setattr(worker, "call", change_question)
+    with pytest.raises(ResearchError, match="numbered question"):
+        run(library, worker)
+    assert case_states(library)[0]["status"] == "unfinished"
+
+
+@pytest.mark.parametrize("artifact", ["review-a.json", "assessment.json"])
+def test_editing_a_saved_judgment_invalidates_review_status(library, worker, artifact):
+    run(library, worker)
+    path = assessment_dir(library) / artifact
+    record = load(path)
+    record["result"]["value"]["conclusion"] = "supports"
+    save(path, record)
+    with pytest.raises(ResearchError, match="accepted job output"):
+        check_assessment(path.parent)
+    assert case_states(library)[0]["status"] == "unfinished"
+
+
+def test_whitespace_extract_cannot_count_as_retrieved_evidence(library, worker):
+    worker.case["sources"][0]["excerpt"] = " \n\t "
+    with pytest.raises(ResearchError, match="Invalid prepare"):
+        run(library, worker)
+    assert not [call for call in worker.calls if call[1] == "review"]

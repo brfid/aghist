@@ -8,7 +8,7 @@ class ResearchError(RuntimeError):
     """Work cannot safely proceed; existing outputs remain available for inspection."""
 
 
-TEXT = {"type": "string", "minLength": 1}
+TEXT = {"type": "string", "minLength": 1, "pattern": r"\S"}
 STRINGS = {"type": "array", "items": TEXT}
 
 

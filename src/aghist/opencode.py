@@ -133,6 +133,31 @@ class OpenCode:
                         "backend": self.url, "checked_at": now()}
         return self.runtime
 
+    def check_active_sessions(self, allowed=()):
+        """Admit a coordinator only when earlier owned remote jobs are accounted for.
+
+        Args:
+            allowed: Recorded session IDs from the one run being resumed. An active
+                session from another run must be stopped or resumed first.
+
+        Raises:
+            ResearchError: A surviving aghist job would escape this coordinator,
+                or more than two owned jobs are already active.
+        """
+        owned = []
+        for session, status in self.request("GET", "/session/status").items():
+            if status["type"] == "idle":
+                continue
+            info = self.request("GET", f"/session/{session}")
+            if info.get("title", "").startswith("aghist "):
+                owned.append(session)
+        if len(owned) > 2:
+            raise ResearchError("More than two owned sessions are active; stop them in OpenCode to restore the two-agent cap.")
+        unknown = set(owned) - set(allowed)
+        if unknown:
+            raise ResearchError("An earlier aghist session is still active: " + ", ".join(sorted(unknown)) +
+                                ". Resume its recorded run or stop it in OpenCode before starting new work.")
+
     def cancel_active(self):
         """Stop active jobs after a failure, deadline or user interruption."""
         self.stop.set()
@@ -164,18 +189,44 @@ class OpenCode:
         directory = Path(directory)
         spec = {"kind": kind, "prompt": prompt, "sources": list(map(str, sources)),
                 "model": self.model, "schema": SCHEMAS[kind]}
-        attempts = sorted(directory.glob("attempt-*"))
+        attempts = []
+        for folder in sorted(directory.glob("attempt-*")):
+            if (folder / "request.json").exists():
+                attempts.append(folder)
+            elif any(not p.name.startswith(".writing-") or not p.is_file() or p.is_symlink()
+                     for p in folder.iterdir()):
+                raise ResearchError(f"Attempt metadata is incomplete; inspect {folder} before continuing.")
+            # An empty directory or an interrupted atomic-write temporary file
+            # precedes the request checkpoint, so no model call was submitted.
         attempt = attempts[-1] if attempts else None
         if attempt:
             request = load(attempt / "request.json")
-            state = load(attempt / "state.json")
             if request["spec"] != spec:
                 raise ResearchError(f"Job inputs changed: {directory}")
+            if not (attempt / "state.json").exists():
+                # No submission can precede the initial state checkpoint. Inspect
+                # the remote session anyway; existing activity is collected rather
+                # than submitted again, including for older incomplete records.
+                messages = self.request("GET", f"/session/{request['session_id']}/message?limit=1000")
+                self._finished(messages, request)
+                status = self.request("GET", "/session/status").get(request["session_id"], {"type": "idle"})
+                state = {"status": "prepared" if not messages and status["type"] == "idle" else "uncertain",
+                         "created_at": request.get("created_at", (attempt / "request.json").stat().st_mtime),
+                         "updated_at": now()}
+                save(attempt / "state.json", state)
+            else:
+                state = load(attempt / "state.json")
             if state["status"] == "complete":
                 result = load(attempt / "result.json")
                 original = self._finished(load(attempt / "messages.json"), request)
                 if original is None or any(result.get(k) != original.get(k) for k in ("value", "receipts", "session_id", "message_id")):
                     raise ResearchError("A completed job output changed; create a new attempt.")
+                # UI steering after one reviewer completed must still be
+                # detected when its cached result is reused after interruption.
+                messages = self.request("GET", f"/session/{request['session_id']}/message?limit=1000")
+                current = self._finished(messages, request)
+                if current is None or any(result.get(k) != current.get(k) for k in ("value", "receipts", "session_id", "message_id")):
+                    raise ResearchError("The completed session no longer matches its accepted output.")
                 return result
             if state["status"] == "failed":
                 # Completion may have preceded a local write failure. Inspect it
@@ -207,13 +258,14 @@ class OpenCode:
                 for pattern in [str(source), str(source) + "/**"]:
                     permissions += [{"permission": t, "pattern": pattern, "action": "allow"}
                                     for t in ("read", "external_directory")]
-            session = self.request("POST", "/session", {"title": f"aghist {directory.parent.name}: {directory.name}",
+            session = self.request("POST", "/session", {"title": f"aghist {directory.parent.parent.name}: {directory.name}",
                                    "permission": permissions})
             request = {"session_id": session["id"], "message_id": "msg_" + uuid.uuid4().hex,
-                       "spec": spec, "allowed_tools": sorted(allowed), "runtime": self.runtime}
+                       "spec": spec, "allowed_tools": sorted(allowed), "runtime": self.runtime,
+                       "created_at": time.time()}
             attempt = directory / f"attempt-{len(attempts) + 1:03d}"
             save(attempt / "request.json", request, immutable=True)
-            state = {"status": "prepared", "created_at": time.time(), "updated_at": now()}
+            state = {"status": "prepared", "created_at": request["created_at"], "updated_at": now()}
             save(attempt / "state.json", state)
         session = request["session_id"]
         with self.mutex:

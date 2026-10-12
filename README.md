@@ -82,7 +82,7 @@ Add `--refresh` and the needed `--source` paths to retrieve new evidence and app
 
 ## Limits and recovery
 
-- One case is prepared and assessed at a time. Two fresh reviewers run concurrently; all other stages run singly. A coordinator lock applies across libraries. Worker agents cannot spawn agents.
+- One case is prepared and assessed at a time. Two fresh reviewers run concurrently; all other stages run singly. A coordinator lock applies across libraries. Startup also checks surviving aghist sessions on the dedicated backend: resume their recorded run or stop them in OpenCode before starting other work. This covers remote jobs that outlive a crashed coordinator or failed cancellation. Worker agents cannot spawn agents.
 - A batch considers at most three candidates, with zero a valid result. Default run allowance: 30 minutes; default per-task allowance: 600 seconds; default observed tool-call limit: 16. Use `--minutes`, `--task-seconds` and `--max-tools` deliberately. A task already in flight can briefly exceed a bound while its next status check or HTTP request finishes.
 - Review packets are limited to 256 KB. They contain the actual selected retrieval text, exact question, neutral account, provenance and known limits. Both reviewers receive identical bytes and no file/web tools. A single SHA-256 checksum detects changed packets; readable IDs identify question and evidence versions.
 - Provider retry/quota errors, unexpected permission requests, invalid outputs, deadlines and interruptions leave work unfinished. Already completed stages are reused. One explicit retry of a stopped failed job is available; no automatic provider change occurs.
@@ -92,7 +92,9 @@ uv run aghist status --library /absolute/path/library
 uv run aghist resume --library /absolute/path/library run-YYYYMMDD-HHMMSS-abcdef
 ```
 
-`status` reads files without contacting OpenCode and distinguishes principal-version reviews from outdated or unfinished cases. `resume` uses the run's recorded brief, source paths, model and question; it gives the invocation another saved run allowance. Task deadlines still include interrupted time, but completed remote results are collected before an expired task is rejected.
+`status` reads files without contacting OpenCode and distinguishes principal-version reviews from outdated or unfinished cases. It checks exact numbered question text, frozen case/evidence data and saved judgments against their accepted job outputs.
+
+`resume` uses the run's recorded brief, source paths, model and question; it gives the invocation another saved run allowance. It checks remote sessions even when reusing completed jobs, so later UI input is detected. Task deadlines still include interrupted time, but completed remote results are collected before an expired task is rejected. An interrupted initial state checkpoint is recovered by inspecting the recorded session before any submission. Empty, unsubmitted attempt folders can be reused; other incomplete request records stop for inspection.
 
 After fixing a confirmed failed job's cause, use `resume ... --retry-failed` once. A submission with an unknown outcome is inspected rather than silently repeated. If it cannot be resolved from the saved session, it remains uncertain and requires manual inspection. To restart such work deliberately, create a new run after confirming the old session has stopped. Preserve the uncertain run as part of the record.
 
@@ -118,13 +120,13 @@ runs/<run>/jobs/<stage>/attempt-001/  # request, state, actual messages, result
 runs/<run>/summary.md                 # synthesis and question-refinement rationale
 ```
 
-JSON records own metadata and structured results; Markdown renders make accounts and judgments browsable. Attempt outputs, numbered question versions and evidence revisions are preserved. Research memory is reconstructed from these folders; OpenCode sessions support inspection and recovery but are not the research record.
+JSON records own metadata and structured results; Markdown renders make accounts and judgments browsable. Each review and reconciliation names its original run/job record, which remains necessary for validating completion. Attempt outputs, numbered question versions and evidence revisions are preserved. Research memory is reconstructed from these folders; OpenCode sessions support inspection and recovery but are not the research record.
 
 Actual retrieved text, tool failures and truncation metadata are retained. Source excerpts must match returned text at the reported origin. Previously checked historical quotations can be reused as retained extracts, preserving their original attribution and inspection limits without passing along the earlier dossier's verdicts. They are labeled as prior inspection rather than a fresh reading of the original. This checks quotation provenance, not historical truth. Local text and the backend's supported web retrieval work directly; inaccessible PDFs or missing scans remain explicit gaps. There is no OCR pipeline in this version.
 
 ## Verification
 
-`uv run pytest` uses temporary libraries and deterministic workers/API fixtures. It covers independent review inputs, source preservation, packet changes, question/evidence revisions, invalidating conclusions, partial writes, writer conflicts, remote-completion recovery, uncertain submissions, permission/timeout/tool limits, subscription stops and bounded retries. Tests make no model calls.
+`uv run pytest` uses temporary libraries and deterministic workers/API fixtures. It covers independent review inputs, source preservation, packet changes, question/evidence revisions, invalidating conclusions, partial writes, writer conflicts, remote-completion recovery, uncertain submissions, permission/timeout/tool limits, subscription stops and bounded retries. Regression checks also cover surviving remote sessions, initial-checkpoint recovery, later UI input, and schema-valid edits to saved judgments or numbered questions. Tests make no model calls.
 
 The installed OpenCode 1.18.35 API was checked without generation using `noReply=true`: supplied message IDs and scoped session permissions survived round trips. Model inference, source retrieval and end-to-end historical quality remain unverified pending subscription reactivation.
 

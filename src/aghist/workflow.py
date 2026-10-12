@@ -108,6 +108,29 @@ def scan_cases(root):
     return cases
 
 
+def check_job_output(root, run_id, artifact, suffix):
+    """Check a saved judgment against its accepted local agent-job output.
+
+    Args:
+        root: Library containing the original run/job records.
+        run_id: Run owning this assessment folder.
+        artifact: Review or reconciliation record with an engine-assigned job name.
+        suffix: Expected role, such as review-a or reconcile.
+
+    Raises:
+        ResearchError: The accepted job is missing, unfinished, or differs.
+    """
+    job = artifact.get("job", "")
+    if not re.fullmatch(r"case-[0-9]{3,}-" + re.escape(suffix), job):
+        raise ResearchError("The judgment has no valid accepted job output reference.")
+    directory = Path(root) / "runs" / identifier(run_id) / "jobs" / job
+    attempts = sorted(directory.glob("attempt-*"))
+    if not attempts or load(attempts[-1] / "state.json").get("status") != "complete":
+        raise ResearchError("The accepted job output is missing or unfinished.")
+    if load(attempts[-1] / "result.json") != artifact["result"]:
+        raise ResearchError("The saved judgment differs from its accepted job output.")
+
+
 def check_assessment(directory):
     """Verify a completion receipt against its packet, reviews and assessment.
 
@@ -126,6 +149,9 @@ def check_assessment(directory):
     case_root = directory.parents[3]
     if case_root.name != packet["case_id"] or directory.parent.name != packet["question_version"] or directory.parent.parent.name != packet["question_id"]:
         raise ResearchError("Assessment folder and recorded identifiers disagree.")
+    root = case_root.parents[1]
+    if question_path(root, packet["question_id"], packet["question_version"]).read_text() != packet["question"]:
+        raise ResearchError("The numbered question version changed; append a new version.")
     revision_dir = case_root / "revisions" / packet["evidence_revision"]
     case = load(revision_dir / "case.json")
     if packet["case"] != {k: case[k] for k in ("title", "boundary", "account", "uncertainties")} or packet["evidence"] != load(revision_dir / "evidence.json"):
@@ -140,11 +166,13 @@ def check_assessment(directory):
         if any(review.get(k) != v for k, v in context.items()):
             raise ResearchError("A completed review refers to different inputs.")
         validate("review", review["result"]["value"])
+        check_job_output(root, directory.name, review, f"review-{label}")
         sessions.append(review["result"]["session_id"])
     assessment = load(directory / "assessment.json")
     if any(assessment.get(k) != v for k, v in context.items()) or complete.get("assessment") != "assessment.json":
         raise ResearchError("The reconciled assessment refers to different inputs.")
     validate("reconcile", assessment["result"]["value"])
+    check_job_output(root, directory.name, assessment, "reconcile")
     if len(set(sessions)) != 2 or complete.get("sessions") != sessions:
         raise ResearchError("Independent review sessions are missing or inconsistent.")
     return complete
@@ -409,7 +437,7 @@ class Workflow:
                 for future in as_completed(futures):
                     label = futures[future]
                     result = future.result()
-                    reviews[label] = {**context, "result": result}
+                    reviews[label] = {**context, "job": f"case-{index + 1:03d}-review-{label}", "result": result}
                     save(assessment_dir / f"review-{label}.json", reviews[label], immutable=True)
                     atomic_write(assessment_dir / f"review-{label}.md", render(f"Independent review {label.upper()}", result["value"]), immutable=True)
             except BaseException:
@@ -422,7 +450,7 @@ class Workflow:
         prompt = METHOD + "\nReconcile the two independent reviews against the frozen packet. Preserve unresolved disagreement and concrete contrary evidence. Do not treat agreement as source corroboration or force a favorable conclusion.\n"
         prompt += json.dumps({"packet": packet, "reviews": reviews}, ensure_ascii=False)
         result = self._call(f"case-{index + 1:03d}-reconcile", "reconcile", prompt)
-        assessment = {**context, "result": result}
+        assessment = {**context, "job": f"case-{index + 1:03d}-reconcile", "result": result}
         save(assessment_dir / "assessment.json", assessment, immutable=True)
         atomic_write(assessment_dir / "assessment.md", render("Reconciled assessment", result["value"]), immutable=True)
         if packet_checksum(packet_path) != checksum:

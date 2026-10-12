@@ -62,10 +62,11 @@ class FakeWorker:
         self.cancelled = True
 
     def call(self, directory, kind, prompt, *, sources=()):
-        path = directory / "fake-result.json"
+        attempt = directory / "attempt-001"
+        path = attempt / "result.json"
         request = {"kind": kind, "prompt": prompt, "sources": list(map(str, sources))}
         if path.exists():
-            assert load(directory / "fake-request.json") == request
+            assert load(attempt / "request.json")["spec"] == request
             return load(path)
         with self.mutex:
             self.calls.append((directory.name, kind))
@@ -100,8 +101,9 @@ class FakeWorker:
                       "session_id": "session-" + directory.parent.parent.name + "-" + directory.name,
                       "message_id": "message-" + directory.name,
                       "runtime": {"model": self.model}, "completed_at": "fixture-time", "usage": []}
-            save(directory / "fake-request.json", request, immutable=True)
+            save(attempt / "request.json", {"spec": request, "session_id": result["session_id"]}, immutable=True)
             save(path, result, immutable=True)
+            save(attempt / "state.json", {"status": "complete"})
             return result
         finally:
             with self.mutex:

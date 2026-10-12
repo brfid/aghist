@@ -8,7 +8,7 @@ from pathlib import Path
 
 from .contracts import ResearchError
 from .opencode import DEFAULT_MODEL, OpenCode
-from .store import (add_version, init_library, library_lock, load,
+from .store import (add_version, identifier, init_library, library_lock, load,
                     question_path, save)
 from .workflow import Workflow, case_states
 
@@ -101,6 +101,15 @@ def main(argv=None):
                 state_home = Path(os.environ.get("AGHIST_STATE_DIR", Path.home() / ".local/state/aghist"))
                 with library_lock(state_home / "coordinator"):
                     worker.preflight()
+                    allowed = set()
+                    if args.command == "resume":
+                        recorded_run = args.library / "runs" / identifier(args.run_id)
+                        load(recorded_run / "run.json")
+                        for job in recorded_run.glob("jobs/*"):
+                            requests = sorted(job.glob("attempt-*/request.json"))
+                            if requests:
+                                allowed.add(load(requests[-1])["session_id"])
+                    worker.check_active_sessions(allowed)
                     workflow = Workflow(args.library, worker, progress=lambda text: print(text, flush=True))
                     if args.command == "resume":
                         directory = workflow.run(resume=args.run_id)
