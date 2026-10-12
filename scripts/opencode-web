@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+aghist_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+mkdir -p "$aghist_root/.runtime/workspace" "$aghist_root/.runtime/xdg-config"
+cd "$aghist_root/.runtime/workspace"
+export XDG_CONFIG_HOME="$aghist_root/.runtime/xdg-config"
+export OPENCODE_CONFIG="$aghist_root/opencode/opencode.json"
+export OPENCODE_DISABLE_PROJECT_CONFIG=1
+export OPENCODE_DISABLE_CLAUDE_CODE=1
+export OPENCODE_DISABLE_AUTOUPDATE=1
+exec opencode web --pure --hostname 127.0.0.1 --port "${AGHIST_PORT:-4096}"

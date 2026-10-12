@@ -1,13 +1,13 @@
 # Agentic historical research engine
 
-Design, 11 October 2026. This is the authoritative design for `aghist`. Author-selected requirements and implementation choices are recorded below; remaining proposals are labeled. The first topic is maintained independently in [aghist-tech-adoption](../aghist-tech-adoption/README.md).
+Design, 11 October 2026. This is the authoritative design for `aghist`. Author-selected requirements and implementation choices are recorded below; remaining proposals are labeled. The first run writes new research to [aghist-techadoption](../aghist-techadoption/README.md), using the existing [aghist-tech-adoption corpus](../aghist-tech-adoption/README.md) as read-only input.
 
 ## Purpose and repository boundaries
 
 Build a reusable agentic tool for investigating general historical causal claims, initially by explaining **when and how** they hold. The basic research unit is a historical case. Each evaluation applies a specific version of a research question to a particular revision of that case and its evidence.
 
 - **aghist** owns Python software, pytest tests, agent instructions and this design. It accepts a library path rather than containing a particular topic's cases or source rules.
-- **A topic library** owns its research purpose, question versions, case folders, source records, assessments, synthesis and any associated manuscript. The first library is `~/src/aghist-tech-adoption`.
+- **A topic library** owns its research purpose, question versions, case folders, source records, assessments, synthesis and any associated manuscript. The first output library is `~/src/aghist-techadoption`. The existing corpus and manuscript in `~/src/aghist-tech-adoption`, and the navigation pointers in `~/src/posts/tech-adoption`, remain in place and unedited.
 - The existing public site continues to own approved publication copies and site implementation. Large archival originals may remain at the exact external paths recorded by a library.
 
 The engine and library are separate local Git repositories. The engine must be usable with another topic by supplying that topic's question and source guidance, without changing its workflow code. Topic-specific definitions belong in the library rather than the engine's prompts or schemas.
@@ -27,7 +27,7 @@ The engine and library are separate local Git repositories. The engine must be u
 11. Include web discovery and source retrieval in the first working workflow.
 12. Run agents through the author's OpenCode subscription and available OpenCode tooling. Start with the latest DeepSeek Flash offered there.
 13. Agents may create and test working question versions; the author chooses the principal version.
-14. Existing topic research may be reorganized or used as input for newly prepared cases. Its inherited file layout and case template do not constrain the reusable engine. Preserve evidence, provenance and the scope of earlier judgments.
+14. Existing topic research is an ordinary, explicitly supplied read-only input to a run, whose new cases are written to a separate output library. Its inherited file layout and case template do not constrain the reusable engine. Preserve source files, provenance and the scope of earlier judgments; reject overlapping input/output paths.
 
 ## Methodological approach
 
@@ -71,7 +71,7 @@ The selected question version and the library's explicit source guidance govern 
 
 ## Minimal team workflow
 
-Python coordinates four agent sessions per case: one researcher for discovery, retrieval and case preparation; two independent evaluators; and one curator/reconciler. The initial workflow processes one case at a time. At most two agents run concurrently, during the independent reviews. Worker agents cannot launch further agents. The concurrency limit applies across the entire run.
+Python coordinates four agent sessions per case: one researcher for discovery, retrieval and case preparation; two independent evaluators; and one curator/reconciler. The initial workflow processes one case at a time. At most two agents run concurrently, during the independent reviews. Worker agents cannot launch further agents. The concurrency limit applies across all engine-managed work through a coordinator lock. One discovery session and one synthesis session serve each batch in addition to the four per-case sessions.
 
 1. Select a bounded investigation addressing a useful uncertainty or comparison.
 2. Gather sources and prepare a case account plus an evidence packet with exact provenance and locators.
@@ -125,26 +125,35 @@ The author's purpose anchors the inquiry. A different outcome, population or pur
 
 ```text
 README.md
-notes.md
-questions/
-  technology-and-work/
-    question.md
-    versions/v001.md
-cases/
-  electric-motors-and-factory-layout/
+library.json
+questions/<question-id>/versions/v001.md
+cases/<case-id>/
+  case.md
+  revisions/r001/
+    case.json
     case.md
-    sources/
-    assessments/
-      technology-and-work/
-        v001/
-          review-a.md
-          review-b.md
-          assessment.md
-supporting/
-article/
+    evidence.json
+    retrieval.json
+  assessments/<question-id>/<question-version>/<run-id>/
+    packet.json
+    review-a.json
+    review-a.md
+    review-b.json
+    review-b.md
+    assessment.json
+    assessment.md
+    complete.json
+runs/<run-id>/
+  run.json
+  jobs/<stage>/attempt-001/
+    request.json
+    state.json
+    messages.json
+    result.json
+  summary.md
 ```
 
-This illustrates the first library, not mandatory technology-specific engine fields. A question version can also be marked as a working proposal. Exact record serialization is an implementation choice; stable identifiers, version references and evidence revisions are required. A new assessment of changed evidence goes in a distinct assessment revision or run folder; it never overwrites earlier reviews.
+This is the implemented generic layout. `library.json` owns the stable purpose and principal question pointer; numbered Markdown files preserve exact question text. JSON owns structured results and metadata, with Markdown renders for browsing. A question version can also be marked as a working proposal. Exact record serialization is an implementation choice; stable identifiers, version references and evidence revisions are required. A new assessment of changed evidence goes in a distinct assessment revision or run folder; it never overwrites earlier reviews.
 
 Folders retain descriptive names regardless of classification. A folder scan finds cases, assessments and pending reassessment; a separate maintained case index is unnecessary. Any later search index must be rebuildable from authoritative files. Shared source originals can stay outside case folders with precise references. A small amount of operational state records attempts, expenditure and running work; it must not become a second catalogue of research knowledge.
 
@@ -152,17 +161,17 @@ The initial library preserves earlier case verdicts and their original scope. Mo
 
 ## Using existing research
 
-The author permits reorganizing the technology-adoption library to fit aghist. The engine therefore needs no compatibility layer for its earlier case format. Existing accounts, source records and assessments remain research material with their original provenance and scope. Reformatting a case does not validate it, and earlier verdicts do not become new independent reviews.
+The existing technology-adoption corpus is an ordinary read-only input, supplied by path, to a new aghist run. New research is written to `~/src/aghist-techadoption`. Leave the full corpus at `~/src/aghist-tech-adoption` and the original `posts/tech-adoption` navigation pointers in place and unedited. There is no further corpus migration or compatibility layer.
 
-**Proposed first-library approach:** use a few existing dossiers as inputs to the ordinary researcher stage, alongside fresh discovery. The researcher prepares a bounded historical account and an evidence packet; the two reviewers and curator then use the same workflow as for a newly discovered case. Preserve a reference to the inherited dossier and to the underlying sources actually used. Distinguish newly inspected evidence from checks reported in earlier notes, and carry forward access limits. A prior AI-generated summary can supply leads and pointers to attributed historical accounts, but it does not become another historical source corroborating the publications it summarizes.
+The ordinary researcher stage uses earlier dossiers as leads, retrieves sources, and prepares bounded historical accounts and evidence packets. The two reviewers and curator then use the same workflow as for newly discovered cases. Preserve references to inherited dossiers and to underlying sources actually used. Distinguish new inspection from checks reported in earlier notes, and carry forward access limits. A prior AI summary supplies leads, not additional corroboration of its source publications.
 
-The review packet omits earlier eligibility labels, rankings and verdicts. It retains substantive evidence, contradictions and source qualifications. The curator may compare old and new assessments after both independent reviews are saved. Several inherited notes may describe one episode; one note may contain several episodes. Prepare cases around historical boundaries rather than assuming one new case per old file.
+The shared review packet omits earlier eligibility labels, rankings and verdicts, retaining substantive source evidence, contradictions and qualifications. The researcher may use earlier research; isolated reviewers receive only the frozen packet. Several old notes may inform one episode, and one note may supply several episodes. The new output format follows the reusable workflow rather than the source corpus's layout.
 
-Choose the generic case and assessment formats by trying a small set of contrasting cases before any bulk reorganization. Preserve earlier records as source material rather than replacing them with new accounts. Exact folder changes remain an implementation choice. A file reorganization or narrative-template change alone does not change the research question; changed definitions, scope or assessment criteria require a new question version. The adopted v001 stays intact.
+Start with a small pilot and inspect its evidence and judgments before broad collection. Creating a case does not validate it. A file reorganization or narrative-template change alone does not change the question; changed definitions, scope or assessment criteria require a new version. The initial output library imports the adopted v001's wording and criteria as its own explicit baseline; later working versions do not automatically replace it.
 
 ## Architecture review — accepted implementation decisions
 
-**Status:** Accepted, with hashing narrowed to one checksum per frozen review packet. **Date:** 11 October 2026. **Decider:** the author. The agreed requirements, two-agent concurrency cap and independent topic library remain in force. These decisions do not themselves resume implementation or start a live campaign.
+**Status:** Accepted, with hashing narrowed to one checksum per frozen review packet. **Date:** 11 October 2026. **Decider:** the author. The agreed requirements, two-agent concurrency cap and independent topic library remain in force. Implementation is authorized. The author will reactivate OpenCode Go before a live research run; no further model calls are authorized in the meantime.
 
 ### Context and recommendation
 
@@ -226,7 +235,7 @@ Use the documented local server interface from Python; the accepted `opencode we
 
 Use OpenCode's available `websearch` and `webfetch` tools for discovery and page retrieval before adding another search service. Retain returned evidence with its URL, retrieval time, bibliographic identity, useful locators and actual inspection limits. Search results alone do not validate a case. A converted page or extracted text must not be described as a preserved original PDF. Source storage follows the selected library's instructions.
 
-The selected initial model route is **`opencode-go/deepseek-v4.1-flash`**, confirmed in the installed OpenCode 1.18.35 model list on 11 October 2026; the Go connection was listed as configured. This verifies local configuration, not a successful live inference or current quota. DeepSeek's current Flash release is V4.1, and OpenCode's Go documentation lists that release under `deepseek-v4.1-flash`. Resolve the latest supported Flash at the start of a batch and record the exact provider/model, reported model information, OpenCode version and date in its outputs; keep the choice fixed within a batch.
+The selected initial model route is **`opencode-go/deepseek-v4.1-flash`**, confirmed in the installed OpenCode 1.18.35 model list on 11 October 2026; the Go connection was listed as configured. This verifies local configuration, not a successful live inference or current quota. DeepSeek's current Flash release is V4.1, and OpenCode's Go documentation lists that release under `deepseek-v4.1-flash`. The first implementation pins this verified route, records provider/model information and OpenCode version, and refuses a route change on resumption. Change the configured default deliberately when a newer Flash release has been checked.
 
 References: OpenCode [server](https://opencode.ai/docs/server/), [CLI](https://opencode.ai/docs/cli/), [tools](https://opencode.ai/docs/tools/) and [Go models and usage limits](https://opencode.ai/docs/go/), plus DeepSeek's [current model details](https://api-docs.deepseek.com/quick_start/pricing/), checked 11 October 2026. The first implementation should check the installed server's schema instead of assuming every current documentation example matches it. Use bounded batches and stop on subscription quota or runtime limits rather than silently changing the billing route.
 
@@ -234,8 +243,14 @@ Use pytest for meaningful checks of version immutability, references to the inte
 
 Use Google-style docstrings for non-trivial objects, explaining behavior, arguments, returns and exceptions where useful. Prefer straightforward functions and a small number of modules. No dashboard, database, search index, plugin framework or multi-provider framework is needed for the first working loop. Add capabilities only when the basic workflow exposes a concrete need.
 
-## First build target
+## First implemented workflow and verification
 
-Implement one bounded, manually started batch that discovers and retrieves evidence, prepares a historical case, obtains two independent reviews and saves the assessment against an explicit question and evidence revision. Include working question versions that agents can test without changing the author-selected principal version. Exercise failure and resumption using pytest and fake workers before checking a small live batch through OpenCode.
+The first version implements one bounded, manually started batch, with discovery, retrieval, case preparation, two isolated reviews, reconciliation and batch synthesis. Runs can use existing corpora as read-only inputs or start with web discovery. Explicit reassessment reuses an evidence revision under another question version; refresh appends new evidence. Agents may propose working question versions; only the author-facing adopt command changes the principal pointer.
+
+The implementation uses locally schema-validated JSON responses. It omits OpenCode's deprecated prompt tools field because the installed 1.18.35 implementation replaces session permissions when that field is present. Scoped session permissions and an isolated backend profile instead enforce role access. A single packet checksum detects changed review inputs. Packets are bounded at 256 KB; extra retrieval or a different evidence selection requires a new revision.
+
+Offline pytest checks cover independent reviews, read-only inputs, version/reference preservation, stale assessments, atomic writes, writer conflicts, crash recovery, unknown submission outcomes, tool/permission/time limits and subscription retry stops. Installed-API checks with noReply=true verified message IDs and permission preservation without generation. The initial live request was rejected for an inactive Go subscription and was aborted. Historical source retrieval and full model-generated output quality remain unverified until the author reactivates it.
+
+This version runs one batch per invocation. Longer time allowances do not automatically repeat batches. The proposed hours-long repetition, scheduling and process supervision remain later work after a successful inspected pilot.
 
 The author has settled question authority, discovery from the beginning, Python, OpenCode subscription access and the initial model family. The main architecture and the smaller implementation with explicit record/recovery contracts above are accepted. Numeric batch limits are conservative implementation defaults that can be adjusted after observing actual work. Continuous scheduling and broader tooling come after the basic loop works.
