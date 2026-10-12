@@ -27,6 +27,7 @@ The engine and library are separate local Git repositories. The engine must be u
 11. Include web discovery and source retrieval in the first working workflow.
 12. Run agents through the author's OpenCode subscription and available OpenCode tooling. Start with the latest DeepSeek Flash offered there.
 13. Agents may create and test working question versions; the author chooses the principal version.
+14. Existing topic research may be reorganized or used as input for newly prepared cases. Its inherited file layout and case template do not constrain the reusable engine. Preserve evidence, provenance and the scope of earlier judgments.
 
 ## Methodological approach
 
@@ -66,7 +67,7 @@ Assessments explain source fidelity, relevance to the question's scope, the mech
 
 Evaluators must assess the question's actual wording. Benefits without a new work change can challenge a necessity claim, but may reveal an already suitable arrangement. Failure despite a work change bears on sufficiency and scope; it does not alone disprove necessity. Missing evidence or failed retrieval is not evidence that an event did not occur.
 
-The library's existing research criteria govern its case inclusion. The engine should not impose universal demands for controlled comparisons, large effects or independent corroboration. The strength of a case's contribution to a particular generalization is a separate assessment.
+The selected question version and the library's explicit source guidance govern case inclusion and assessment. The engine should not impose universal demands for controlled comparisons, large effects or independent corroboration. The strength of a case's contribution to a particular generalization is a separate assessment. The inherited technology-adoption template is topic guidance, not the engine's common case schema; a generic case account must accommodate adverse outcomes, absent work changes and unresolved mechanisms.
 
 ## Minimal team workflow
 
@@ -149,9 +150,19 @@ Folders retain descriptive names regardless of classification. A folder scan fin
 
 The initial library preserves earlier case verdicts and their original scope. Moving a record into a case folder or creating the first question version does not turn those verdicts into completed evaluations under the new engine.
 
-## Architecture review — proposed implementation decisions
+## Using existing research
 
-**Status:** Proposed refinements to the accepted plan. **Date:** 11 October 2026. **Decider:** the author. The agreed requirements, two-agent concurrency cap and independent topic library remain in force. This section evaluates implementation choices; it does not resume implementation or start research.
+The author permits reorganizing the technology-adoption library to fit aghist. The engine therefore needs no compatibility layer for its earlier case format. Existing accounts, source records and assessments remain research material with their original provenance and scope. Reformatting a case does not validate it, and earlier verdicts do not become new independent reviews.
+
+**Proposed first-library approach:** use a few existing dossiers as inputs to the ordinary researcher stage, alongside fresh discovery. The researcher prepares a bounded historical account and an evidence packet; the two reviewers and curator then use the same workflow as for a newly discovered case. Preserve a reference to the inherited dossier and to the underlying sources actually used. Distinguish newly inspected evidence from checks reported in earlier notes, and carry forward access limits. A prior AI-generated summary can supply leads and pointers to attributed historical accounts, but it does not become another historical source corroborating the publications it summarizes.
+
+The review packet omits earlier eligibility labels, rankings and verdicts. It retains substantive evidence, contradictions and source qualifications. The curator may compare old and new assessments after both independent reviews are saved. Several inherited notes may describe one episode; one note may contain several episodes. Prepare cases around historical boundaries rather than assuming one new case per old file.
+
+Choose the generic case and assessment formats by trying a small set of contrasting cases before any bulk reorganization. Preserve earlier records as source material rather than replacing them with new accounts. Exact folder changes remain an implementation choice. A file reorganization or narrative-template change alone does not change the research question; changed definitions, scope or assessment criteria require a new question version. The adopted v001 stays intact.
+
+## Architecture review — accepted implementation decisions
+
+**Status:** Accepted, with hashing narrowed to one checksum per frozen review packet. **Date:** 11 October 2026. **Decider:** the author. The agreed requirements, two-agent concurrency cap and independent topic library remain in force. These decisions do not themselves resume implementation or start a live campaign.
 
 ### Context and recommendation
 
@@ -181,7 +192,7 @@ flowchart LR
 
 ### Record and evidence contracts
 
-- A job freezes its question text, case account and selected evidence. Record the question ID/version **and content hash**. Hash only research inputs; generated reviews and logs must not make their own evidence revision stale. Changing a frozen input creates a new assessment revision.
+- A job saves one frozen review packet containing the exact question text, case account and selected source evidence supplied to both reviewers. Use readable question versions and case/evidence revision IDs for naming and navigation. Record one SHA-256 checksum of the packet's saved bytes and check it before reusing a review after interruption and before accepting completion. Include the evidence text itself, not only paths to mutable files. A changed packet requires a new assessment revision and fresh reviews. Keep generated reviews and logs outside the packet. This is a small guard against mixing revisions, not a content-addressed store or a separate per-file hashing system.
 - Save actual search/retrieval outputs from OpenCode, including failures and truncation/access limits. Give reviewers the retrieved evidence as well as the neutral case account. A researcher-generated source list or paraphrase alone is insufficient. A fetched page is evidence of retrieval, not a mechanical proof of the researcher's causal interpretation.
 - Use a few small structured output contracts for case preparation, review and reconciliation. Python adds authoritative IDs, evidence references and execution metadata, rather than trusting model-echoed identifiers. Keep analytical explanations in prose; schema validity does not establish historical validity.
 - Keep workflow completion separate from research conclusions. Two complete reviews can conclude that a case is mixed, irrelevant, unresolved or invalidating. Preserve those conclusions without treating them as execution errors or rewarding supporting cases.
@@ -227,4 +238,4 @@ Use Google-style docstrings for non-trivial objects, explaining behavior, argume
 
 Implement one bounded, manually started batch that discovers and retrieves evidence, prepares a historical case, obtains two independent reviews and saves the assessment against an explicit question and evidence revision. Include working question versions that agents can test without changing the author-selected principal version. Exercise failure and resumption using pytest and fake workers before checking a small live batch through OpenCode.
 
-The author has settled question authority, discovery from the beginning, Python, OpenCode subscription access and the initial model family. The main architecture is selected; the review above proposes a smaller implementation and explicit record/recovery contracts. Numeric batch limits are conservative implementation defaults that can be adjusted after observing actual work. Continuous scheduling and broader tooling come after the basic loop works.
+The author has settled question authority, discovery from the beginning, Python, OpenCode subscription access and the initial model family. The main architecture and the smaller implementation with explicit record/recovery contracts above are accepted. Numeric batch limits are conservative implementation defaults that can be adjusted after observing actual work. Continuous scheduling and broader tooling come after the basic loop works.
