@@ -70,7 +70,7 @@ The library's existing research criteria govern its case inclusion. The engine s
 
 ## Minimal team workflow
 
-Use a coordinator, researchers, two independent evaluators and a curator/reconciler. The coordinator may also curate and synthesize; roles need not be permanently running processes.
+Python coordinates four agent sessions per case: one researcher for discovery, retrieval and case preparation; two independent evaluators; and one curator/reconciler. The initial workflow processes one case at a time. At most two agents run concurrently, during the independent reviews. Worker agents cannot launch further agents. The concurrency limit applies across the entire run.
 
 1. Select a bounded investigation addressing a useful uncertainty or comparison.
 2. Gather sources and prepare a case account plus an evidence packet with exact provenance and locators.
@@ -81,6 +81,34 @@ Use a coordinator, researchers, two independent evaluators and a curator/reconci
 Separate input packets and access controls should enforce review independence. A researcher summary alone does not replace accessible original evidence. Concurrent workers write separate outputs; one curator writes the accepted account and assessment. A case becomes reviewed for a version only after the required valid evaluations and reconciled assessment exist.
 
 Collection proceeds in bounded, resumable batches with explicit call, runtime and retrieval limits and stopping rules. Use the selected subscription route; quota exhaustion leaves work resumable. A paid fallback or additional service would be a separate choice. Invalidating, adverse and mixed cases receive the same seriousness and source standards as supporting cases. Discovery routes should seek meaningful contrasts rather than only sources already endorsing the proposition. The goal is informative evidence, including evidence that weakens an explanation.
+
+## Accepted operating defaults
+
+The author accepted these defaults on 11 October 2026:
+
+- A manually started batch considers up to three candidate cases, one case at a time. No suitable case is a valid result; do not fill a quota.
+- A short research brief directs each batch toward a gap, mechanism or useful contrast, under an explicit question version.
+- Fresh reviewers receive identical frozen evidence and no prior assessments or each other's verdicts.
+- Preserve completed stages, resume unfinished work, use bounded retries and stop on subscription limits.
+- Append evidence and assessment revisions; preserve earlier case accounts and judgments.
+- End each batch with grounded refinement proposals. Agents may create and test working versions; the author selects the principal question.
+- Use an OpenCode backend with browser access through `opencode web`; its terminal UI can attach to the same backend. Inspect sessions at any time; pause the workflow before manually steering an engine-owned session. Changed review evidence requires fresh reviews.
+- Recurring scheduling follows a reliable first loop. These defaults do not start a background research campaign.
+
+## Running for hours — proposed requirements
+
+Longer unattended work should repeat small, checkpointed batches under a fixed campaign brief, question version and time budget. The following extends the accepted defaults and remains a design proposal:
+
+- Persist queued work, session/message identifiers, inputs and completed outputs before moving to the next stage. After a restart, inspect already submitted work before creating another request. A lost connection alone does not justify rerunning an agent.
+- Set campaign and per-agent deadlines, a retrieval bound and retry limits. Stop starting new work near the deadline; abort overlong tasks and preserve unfinished state. Quota exhaustion or repeated backend failures stops the campaign without changing provider or billing route.
+- Give agents only the tools needed for their roles. Preconfigure allowed research actions and denied out-of-scope actions. An unexpected permission or user question becomes explicit work needing attention, with a timeout, rather than an indefinite wait.
+- Use one writer for accepted records and a library/run lock to prevent two coordinators writing the same work. Validate question/evidence references and both independent reviews before a case is marked reviewed. Question refinements remain working versions until the author selects a principal version.
+- At batch boundaries, use remaining gaps and contrasts in the brief to choose the next investigation. Record duplicate episodes and sources, retrieval failures and empty results. Stop after repeated batches with no informative progress rather than widening the question merely to keep collecting.
+- Keep a compact current run record with active stage, elapsed time, completed assessments, failures, stopping reason and exact continuation. Keep final research findings in their case/question records. OpenCode sessions support inspection but do not replace durable library records.
+
+A conservative first unattended trial could allow four hours, keep the two-agent concurrency cap and three-case batches, allow ten minutes per agent task, and stop after two successive batches producing only duplicates or inaccessible leads. Numeric limits should be tuned after the first live batch. The host must remain awake with the coordinator alive; resumption should tolerate interruption. Additional process supervision and scheduling are later operational choices.
+
+Sources checked 11 October 2026: OpenCode [server lifecycle and sessions](https://opencode.ai/docs/server/), [permissions](https://opencode.ai/docs/permissions/) and [subscription limits](https://opencode.ai/docs/go/). These document available mechanisms; they do not establish that an hours-long research run has been tested.
 
 ## Empirical refinement and protection against drift
 
